@@ -44,3 +44,7 @@ class PublicDroneControl:
     def rotateDroneLeft(self, multiplier):
         msg = '{"primitiveControls": {"yawRightAmount": ' + str(-multiplier) + '}}'
         self.send(msg)
+
+    def getDroneState(self):
+        msg = '{"getDroneState": "true"}'
+        self.send(msg)
