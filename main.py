@@ -2,7 +2,7 @@ import time
 import threading
 import jparser
 from jparser import y
-from PublicDroneControl import PublicDroneControl
+from publicDroneControl import PublicDroneControl
 import keyboard
 
 import time
