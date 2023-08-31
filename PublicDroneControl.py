@@ -47,11 +47,6 @@ class PublicDroneControl:
         msg = '{"primitiveControls": {"yawRightAmount": ' + str(-multiplier) + '}}'
         self.send(msg)
 
-    def moveDrone(self, multiplierUp, multiplierForward, multiplierRight, multiplierYaw):
-        msg = '{"primitiveControls": {"upAmount": ' + str(multiplierUp) + ', "pitchForwardAmount": ' + str(multiplierForward) + ', "rollRightAmount": ' + str(
-            multiplierRight) + ', "yawRightAmount": ' + str(multiplierYaw) + '}}'
-        self.send(msg)
-
     def getDroneState(self):
         msg = '{"getDroneState": "true"}'
         self.send(msg)
@@ -59,30 +54,3 @@ class PublicDroneControl:
     def sendDroneGrade(self, grade):
         msg = '{"droneGrade": ' + str(grade) + '}'
         self.send(msg)
-
-
-################################################################################
-
-    def countdown_timer(self,seconds):
-        while seconds > 0:
-            print(f"Time left: {seconds} seconds")
-            time.sleep(1)
-            seconds=seconds - 1
-        exit()  # if time finished, exit the program
-
-#Function deacrese 1 point each second
-    def decreaseEachSec(self,points):
-        initializedScore=y["initializedScore"]
-        while True:
-            initializedScore=initializedScore-1
-            time.sleep(1)
-            print(f"points at the end: {initializedScore} points")
-
-
-    def pointsDecreaseCollision(self,numOfCollision):
-        costPerCollision=y["collisionCost"]
-        pointsToDecrease=numOfCollision*costPerCollision
-        return pointsToDecrease
-
-
-
