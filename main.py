@@ -1,49 +1,56 @@
 import time
 import threading
 import jparser
-from jparser import y
-from publicDroneControl import PublicDroneControl
+from jparser import gradeConfig
+from jparser import setup_logger
+from PublicDroneControl import PublicDroneControl
 import keyboard
-
+import Grade
 import time
 import threading
-
-def countdown_timer(seconds):
-    while seconds > 0:
-        print(f"Time left: {seconds} seconds")
-        time.sleep(1)
-        seconds -= 1
-    print("Time's up!")
-    global stop_threads
-    stop_threads = True
-
-def decrease_grade_each_sec(initial_grade, seconds):
-    while seconds > 0 and not stop_threads:
-        print(f"Grade at the end: {initial_grade} points")
-        time.sleep(1)
-        initial_grade -= 1
+from Grade import Grade
 
 if __name__ == '__main__':
-    stop_threads = False
 
-    given_time = y["simulationTime"]
-    initial_grade = y["initializedScore"]
+    # Create a logger
+    logger = setup_logger('my_log_file.log')
 
-    t1 = threading.Thread(target=countdown_timer, args=(given_time,))
-    t2 = threading.Thread(target=decrease_grade_each_sec, args=(initial_grade, given_time))
+    # Create an instance of PublicDroneControl
+    publicDroneControlObject = PublicDroneControl("127.0.0.1", 3001)
 
-    t1.start()
-    t2.start()
+    # Initialize lastTime
+    startTime = time.time()  # Store the initial time
 
-    t1.join()
-    t2.join()
+    # Create and start the Grade thread
+    grade_init = Grade(logger, publicDroneControlObject)
 
+    # While the time of the simulation is not finished yet
+    last_time = time.time()
+    print("grade_init.simulationTime", grade_init.simulationTime)
+    print("startTime", startTime)
+    currTime = time.time()
+    while currTime - startTime <= grade_init.simulationTime:
+        # print("time.time()", time.time())
+
+        if currTime - last_time > 1:
+            # Decrease point each second
+            grade_init.decrease_grade_each_sec()
+            last_time = time.time()
+
+        currTime = time.time()
+
+        # Handle Points in case of collisions
+        # pointsDecreaseCollision(grade_init)
+
+        # decrease_grade_each_sec(grade_init)
+        # time.sleep(1)
+    grade_init.start()  # Starting the Grade thread
+
+    #
     print("Program has finished.")
 
+    # control the drone from the keyboard
 
-
-    #control the drone from the keyboard
-    publicDroneControlObject = PublicDroneControl("127.0.0.1", 3001)
     while True:
         if keyboard.is_pressed('w'):
             publicDroneControlObject.moveDroneForward(1)

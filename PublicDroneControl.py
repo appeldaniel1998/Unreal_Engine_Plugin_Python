@@ -1,6 +1,6 @@
 import socket
 import time
-from jparser import y
+# from jparser import y
 
 
 class PublicDroneControl:
@@ -54,6 +54,10 @@ class PublicDroneControl:
 
     def getDroneState(self):
         msg = '{"getDroneState": "true"}'
+        self.send(msg)
+
+    def sendDroneGrade(self, grade):
+        msg = '{"droneGrade": ' + str(grade) + '}'
         self.send(msg)
 
 
