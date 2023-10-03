@@ -3,59 +3,53 @@ import logging
 import threading
 import time
 
+import Logger
 from PublicDroneControl import PublicDroneControl
-from jparser import gradeConfig
-
-import pymap3d as pm
-
-
-# import numpy as np
-# import cv2
-# import geopy.distance
-# import pymap3d as pm
 
 
 class Grade(threading.Thread):
     """
-    Class to represent the thread which is to handle all grading-related issues of the drone for its reinforcement learning.
-    Current functionality:
+    Class to represent the thread which is to handle all grading-related issues of the drone for its Reinforcement Learning.
+    Required functionality:
     1. Giving grade:
-        1.1. Handle collisions:
-                Whenever the drone collides with a physical object, it is transported back to where it has been up to 10 seconds before (location updates every 10 seconds),
-                one of its "lives" is removed, and some amount of points is deducted. These and other parameters are specified in the json file and from there the information is read.
-        1.2. Handle recognising a Collision:
-                Whenever a collision is recognised (from the image as the camera on the drone is seeing it), and is within a given radius from the drone,
-                the number of points is taken away to the drone.
-        1.3. Handle recognising a Human:
-                Whenever a collision is recognised (from the image as the camera on the drone is seeing it), and is within a given radius from the drone,
-                the number of points is awarded to the drone.
+        1.1. Handle collisions of Drone with objects:
+                For every collision, a certain number of points is deducted from the drone, according to the gradeConfig.json file.
+        1.2. Handle time:
+                For every second, a certain number of points is deducted from the drone, according to the gradeConfig.json file.
+        1.3. Handle target recognition:
+                Whenever a target is recognized (human or QR code), a certain number of points is added to the drone, according to the gradeConfig.json file.
     2. Sending the current grade at some rate per second to the client.
     """
 
-    def __init__(self, logger: logging.Logger, pdcObject: PublicDroneControl):
+    def __init__(self, logger: Logger.LoggerThread, publicDroneControl: PublicDroneControl):
         """
         Constructor of the class. Reads the gradeConfig json file for the needed grading parameters.
         :param logger: logger to log the needed information
-        :param pdcObject: PublicDroneControl object to access the needed information in run function
-        :param clientCommunication: (will be implemented later)Tupple contains:socket for the final grade to be sent to via UDP,Address of the client for the grade to be sent to
-        :param clientSocket:(will be implemented later) socket for the final grade to be sent to via UDP
-        :param clientAddress:(will be implemented later) Address of the client for the grade to be sent to
+        :param publicDroneControl: PublicDroneControl object to access the needed information in run function
         """
-        # Initializing the thread without running
+
+        # Initializing the thread without running it
         threading.Thread.__init__(self)
-        self.pdcObject = pdcObject
+        self._publicDroneControl = publicDroneControl
         self._stop_event = threading.Event()
 
-        # Write all parameters to a log
-        self.logger = logger  # Logger to file
+        self._logger = logger  # Logger to file
 
+        with open("ConfigFiles/GradeConfig.json", "r") as file:  # Reading gradeConfig JSON from file
+            gradeConfig = json.load(file)
         # Load parameters from JSON
-        self.currentPoints: float = gradeConfig["pointsAtStartOfGame"]
-        self.simulationTime: float = gradeConfig["simulationTime"]  # In seconds
-        self.numOfCollisions: float = gradeConfig["CollisionCount"]  # int num
-        self.costPerCollision: float = gradeConfig["collisionCost"]
-        # self.droneRecognitionRadius: float = gradeConfig["droneRecognitionRadius"]  # Max radius from which the aruco codes are recognized by the drone
-        # self.pointsForHumanDetected: float = gradeConfig["pointsForHumanDetected"]  # The number of points the agent receives upon detecting correctly a human
+        self._currentPoints: float = gradeConfig["pointsAtStartOfGame"]
+        self._simulationTime: float = gradeConfig["simulationTime"]  # In seconds
+        self._pointsForTargetDetection: float = gradeConfig["pointsForTargetDetection"]
+        self._pointsDeductedPerCollision: float = gradeConfig["costPointsPerCollision"]
+        self._costPointsPerSec: float = gradeConfig["costPointsPerSec"]
+
+        # Util variables
+        currTime = time.time()
+        self._timeSinceLastSec = currTime
+
+        self._timeSinceLastCollision = currTime
+        self._lastCollisionCount = 0
 
     def stop(self):
         """
@@ -71,15 +65,44 @@ class Grade(threading.Thread):
         """
         return self._stop_event.is_set()
 
-    def decrease_grade_each_sec(self):
+    def run(self):
+        """
+        Method to be executed by the thread.
+        :param self:
+        :return:
+        """
+        startTime = time.time()  # Start time of the thread
+        currTime = time.time()  # Current time of the thread
+
+        while not self.stopped():  # Thread stops upon call to stop() method
+            droneState = self._publicDroneControl.getDroneState()
+            self._handleDecreaseGradeEachSec(currTime)
+            self._handleEndSimulationTime(startTime, currTime)
+            self._handleCollision(currTime, int(droneState["collisionCount"]))
+            currTime = time.time()  # Update current time
+
+    def _handleEndSimulationTime(self, startTime: float, currTime: float):
+        """
+        Function to handle the end of the simulation time
+        :param startTime: start time of the thread
+        :param currTime: current time of the thread
+        :return: None
+        """
+        if abs(currTime - startTime) > self._simulationTime:  # End of simulation time
+            # TODO add logger info
+            self.stop()  # Stop thread
+
+    def _handleDecreaseGradeEachSec(self, currTime: float):
         """
         Function decrease 1 point each second,
         To teach the drone that it depend on time.
         """
-        self.currentPoints -= 1
-        print(f"current points: {self.currentPoints} points")
+        if abs(currTime - self._timeSinceLastSec) > 1:  # Every second
+            self._currentPoints -= self._costPointsPerSec
+            self._timeSinceLastSec = currTime
+            print(f"current points: {self._currentPoints} points")  # TODO change to logger
 
-    def pointsDecreaseCollision(self):
+    def _pointsDecreaseCollision(self):
         """
         FUNCTION NOT GOOD! NEED TO FIX!
         Function compute how many points decrease for all collisions
@@ -91,19 +114,14 @@ class Grade(threading.Thread):
 
         # self.numOfCollisions=0
 
-    def run(self):
+    def _handleCollision(self, currTime: float, collisionCount: int):
         """
-        Method to be executed by the thread.
-        :param self:
-        :return:
+        Function to handle the collision of the drone with physical objects
+        :return: None
         """
-        # Start countdown and points decreasing
-        # self.countdown_timer(self.simulationTime)
-        # self.handleCollisions()  # Handle drone collisions
-
-        # while True:
-        #     #Get drone state
-        #     PublicDroneControl.getDroneState(self.pdcObject)
-        #
-        #     #Decrease points because of collisions
-        #     self.pointsDecreaseCollision()
+        if collisionCount > self._lastCollisionCount:  # If collision occurred
+            if currTime - self._timeSinceLastCollision > 2:  # if enough time passed since last collision (more than 2 seconds) (to avoid multiple collisions in a row)
+                self._currentPoints -= self._pointsDeductedPerCollision
+                self._timeSinceLastCollision = currTime
+                self._lastCollisionCount = collisionCount
+                print(f"Collision Occurred! current points: {self._currentPoints} points")  # TODO change to logger

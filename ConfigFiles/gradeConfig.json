@@ -1,0 +1,7 @@
+{
+    "pointsAtStartOfGame": 100,
+    "simulationTime": 30,
+    "pointsForTargetDetection": 10,
+    "costPointsPerSec": 1,
+    "costPointsPerCollision": 50
+}
