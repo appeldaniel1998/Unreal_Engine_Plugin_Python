@@ -35,8 +35,7 @@ class Grade(threading.Thread):
 
         self._logger = logger  # Logger to file
 
-        with open("ConfigFiles/GradeConfig.json", "r") as file:  # Reading gradeConfig JSON from file
-            gradeConfig = json.load(file)
+        gradeConfig = json.load(open("ConfigFiles/GradeConfig.json", "r"))  # Reading gradeConfig JSON from file
         # Load parameters from JSON
         self._currentPoints: float = gradeConfig["pointsAtStartOfGame"]
         self._simulationTime: float = gradeConfig["simulationTime"]  # In seconds
@@ -89,7 +88,7 @@ class Grade(threading.Thread):
         :return: None
         """
         if abs(currTime - startTime) > self._simulationTime:  # End of simulation time
-            # TODO add logger info
+            self._logger.info(f"Simulation has ended due to timeout. Final number of points: {self._currentPoints}")  # Logging
             self.stop()  # Stop thread
 
     def _handleDecreaseGradeEachSec(self, currTime: float):
@@ -100,19 +99,7 @@ class Grade(threading.Thread):
         if abs(currTime - self._timeSinceLastSec) > 1:  # Every second
             self._currentPoints -= self._costPointsPerSec
             self._timeSinceLastSec = currTime
-            print(f"current points: {self._currentPoints} points")  # TODO change to logger
-
-    def _pointsDecreaseCollision(self):
-        """
-        FUNCTION NOT GOOD! NEED TO FIX!
-        Function compute how many points decrease for all collisions
-        :param self:
-        :return:
-        """
-        pointsToDecrease = self.numOfCollisions * self.costPerCollision
-        self.currentPoints = self.currentPoints - pointsToDecrease
-
-        # self.numOfCollisions=0
+            self._logger.info(f"Decrease points per sec: current points: {self._currentPoints} points")  # Logging
 
     def _handleCollision(self, currTime: float, collisionCount: int):
         """
@@ -124,4 +111,4 @@ class Grade(threading.Thread):
                 self._currentPoints -= self._pointsDeductedPerCollision
                 self._timeSinceLastCollision = currTime
                 self._lastCollisionCount = collisionCount
-                print(f"Collision Occurred! current points: {self._currentPoints} points")  # TODO change to logger
+                self._logger.info(f"Collision Occurred! current points: {self._currentPoints} points")  # Logging

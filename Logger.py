@@ -57,3 +57,57 @@ class LoggerThread(threading.Thread):
         :return: logger
         """
         return self.logger
+
+    def info(self, msg: str) -> None:
+        """
+        Method to log info to file
+        :param msg: message to log
+        :return:
+        """
+        self.logger.info(msg)
+        print(msg)
+
+    def debug(self, msg: str) -> None:
+        """
+        Method to log debug to file
+        :param msg: message to log
+        :return:
+        """
+        self.logger.debug(msg)
+        print(msg)
+
+    def warning(self, msg: str) -> None:
+        """
+        Method to log warning to file
+        :param msg: message to log
+        :return:
+        """
+        self.logger.warning(msg)
+        print(msg)
+
+    def error(self, msg: str) -> None:
+        """
+        Method to log error to file
+        :param msg: message to log
+        :return:
+        """
+        self.logger.error(msg)
+        print(msg)
+
+    def critical(self, msg: str) -> None:
+        """
+        Method to log critical to file
+        :param msg: message to log
+        :return:
+        """
+        self.logger.critical(msg)
+        print(msg)
+
+    def exception(self, msg: str) -> None:
+        """
+        Method to log exception to file
+        :param msg: message to log
+        :return:
+        """
+        self.logger.exception(msg)
+        print(msg)
