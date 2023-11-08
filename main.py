@@ -10,7 +10,7 @@ from datetime import datetime
 if __name__ == '__main__':
 
     # Create a logger
-    logger = LoggerThread("logs\\log_" + datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
+    logger = LoggerThread("logs\\log_" + datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))  # Create a logger thread
 
     publicDroneControl = PublicDroneControl("127.0.0.1", 3001)  # Create an instance of PublicDroneControl
 
@@ -21,9 +21,7 @@ if __name__ == '__main__':
     grade = Grade(logger, publicDroneControl)
     grade.start()
 
-
-
-
+    # Moving the drone on a graph --------------------------------------
 
     points = json.load(open("ConfigFiles/GraphPointsConfig.json", "r"))
 
@@ -52,8 +50,9 @@ if __name__ == '__main__':
             publicDroneControl.moveDroneToLocation(points["7"][0], points["7"][1], points["7"][2], turnWithMove=turn)
         if keyboard.is_pressed('9'):
             publicDroneControl.moveDroneToLocation(points["8"][0], points["8"][1], points["8"][2], turnWithMove=turn)
+    # -------------------------------------------------------------------
 
-    # control the drone from the keyboard
+    # control the drone from the keyboard -------------------------------
 
     # while True:
     #     if keyboard.is_pressed('w'):
@@ -75,3 +74,5 @@ if __name__ == '__main__':
     #     if keyboard.is_pressed('esc'):
     #         break
     #     time.sleep(0.01)  # small delay to prevent hogging the CPU
+
+    #  ----------------------------------------------------------------
