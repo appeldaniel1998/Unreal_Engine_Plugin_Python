@@ -3,7 +3,7 @@
 Run YOLOv5 detection inference on images, videos, directories, globs, YouTube, webcam, streams, etc.
 
 Usage - sources:
-    $ python MainYoloDetectMine.py --weights yolov5s.pt --source 0                               # webcam
+    $ python MainYoloDetectYuval.py --weights yolov5s.pt --source 0                               # webcam
                                                      img.jpg                         # image
                                                      vid.mp4                         # video
                                                      screen                          # screenshot
@@ -15,7 +15,7 @@ Usage - sources:
                                                      'rtsp://example.com/media.mp4'  # RTSP, RTMP, HTTP stream
 
 Usage - formats:
-    $ python MainYoloDetectMine.py --weights yolov5s.pt                 # PyTorch
+    $ python MainYoloDetectYuval.py --weights yolov5s.pt                 # PyTorch
                                  yolov5s.torchscript        # TorchScript
                                  yolov5s.onnx               # ONNX Runtime or OpenCV DNN with --dnn
                                  yolov5s_openvino_model     # OpenVINO
@@ -33,6 +33,7 @@ import csv
 import os
 import platform
 import sys
+import time
 from pathlib import Path
 
 import torch
@@ -55,7 +56,7 @@ from utils.torch_utils import select_device, smart_inference_mode
 @smart_inference_mode()
 def run(
         weights=ROOT / 'yolov5s.pt',  # model path or triton URL
-        source=ROOT / 'data/images',  # file/dir/URL/glob/screen/0(webcam)
+        source=ROOT / 'data/images',  # file/dir/URL/glob/screen/0(webcam)/ROOT / 'data/images'
         data=ROOT / 'data/coco128.yaml',  # dataset.yaml path
         imgsz=(640, 640),  # inference size (height, width)
         conf_thres=0.25,  # confidence threshold
@@ -116,7 +117,10 @@ def run(
 
     # Run inference
     model.warmup(imgsz=(1 if pt or model.triton else bs, 3, *imgsz))  # warmup
+    # Variable declaration
     seen, windows, dt = 0, [], (Profile(), Profile(), Profile())
+    all_coordinates = []  # List to store bounding box coordinates
+    # Loop over dataset
     for path, im, im0s, vid_cap, s in dataset:
         with dt[0]:
             im = torch.from_numpy(im).to(model.device)
@@ -152,6 +156,7 @@ def run(
         # Process predictions
         for i, det in enumerate(pred):  # per image
             seen += 1
+            coordinates_and_labels_for_image = []  # List to store coordinates for the current image
             if webcam:  # batch_size >= 1
                 p, im0, frame = path[i], im0s[i].copy(), dataset.count
                 s += f'{i}: '
@@ -193,19 +198,22 @@ def run(
                     if save_img or save_crop or view_img:  # Add bbox to image
                         c = int(cls)  # integer class
                         label = None if hide_labels else (names[c] if hide_conf else f'{names[c]} {conf:.2f}')
+                        # This line responsible for draw the frames on the detected objects
                         annotator.box_label(xyxy, label, color=colors(c, True))
+                    # Coordinates format:  x_center, y_center, width, height
+                    #xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()
+                    # Coordinates format:   (xmin, ymin, xmax, ymax)
+                    xyxy = ((torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()
+                    line = (label, *xyxy, conf) if save_conf else (label, *xyxy)  # label format xyxy
+                    #line = (label, *xywh, conf) if save_conf else (label, *xywh)  # label format xywh
+                    printed_line = ('%s ' * len(line)).rstrip() % line
+                    coordinates_and_labels_for_image.append(printed_line)
+
                     if save_crop:
                         save_one_box(xyxy, imc, file=save_dir / 'crops' / names[c] / f'{p.stem}.jpg', BGR=True)
 
-            # Stream results
-            im0 = annotator.result()
-            if view_img:
-                if platform.system() == 'Linux' and p not in windows:
-                    windows.append(p)
-                    cv2.namedWindow(str(p), cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO)  # allow window resize (Linux)
-                    cv2.resizeWindow(str(p), im0.shape[1], im0.shape[0])
-                cv2.imshow(str(p), im0)
-                cv2.waitKey(1)  # 1 millisecond
+                # Append the coordinates for the current image to the overall list
+                all_coordinates.append(coordinates_and_labels_for_image)
 
             # Save results (image with detections)
             if save_img:
@@ -229,7 +237,16 @@ def run(
         # Print time (inference-only)
         LOGGER.info(f"{s}{'' if len(det) else '(no detections), '}{dt[1].dt * 1E3:.1f}ms")
 
+
+        break
+
     # Print results
+    # Print or process the coordinates
+    for image_idx, coordinates_and_labels_for_image in enumerate(all_coordinates):
+        print(f"Coordinates for image {image_idx + 1}:")
+        for idx, xyxy in enumerate(coordinates_and_labels_for_image):
+            print(f"  Element {idx + 1}: {xyxy}")
+        print()
     t = tuple(x.t / seen * 1E3 for x in dt)  # speeds per image
     LOGGER.info(f'Speed: %.1fms pre-process, %.1fms inference, %.1fms NMS per image at shape {(1, 3, *imgsz)}' % t)
     if save_txt or save_img:
@@ -237,6 +254,8 @@ def run(
         LOGGER.info(f"Results saved to {colorstr('bold', save_dir)}{s}")
     if update:
         strip_optimizer(weights[0])  # update model (to fix SourceChangeWarning)
+
+    return all_coordinates
 
 
 def parse_opt():
@@ -280,12 +299,15 @@ def parse_opt():
 
 def main(opt):
     check_requirements(ROOT / 'requirements.txt', exclude=('tensorboard', 'thop'))
-    run(**vars(opt))
+    return run(**vars(opt))
 
 
 def yoloRunDetectionMain():
     opt = parse_opt()
-    main(opt)
+    results = main(opt)
+    return results
 
 if __name__ == '__main__':
-    yoloRunDetectionMain()
+    currTime = time.time()
+    print(yoloRunDetectionMain())
+    print("Time taken: " + str(time.time() - currTime))
