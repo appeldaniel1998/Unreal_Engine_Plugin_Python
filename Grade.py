@@ -1,10 +1,12 @@
 import json
-import logging
 import threading
 import time
 
 import Logger
+from ArucoDetection import ArucoDetection
 from PublicDroneControl import PublicDroneControl
+from YoloImpl.MainYoloDetect import YoloDetection
+from ThreadSafeResults import ThreadSafeResults
 
 
 class Grade(threading.Thread):
@@ -43,6 +45,14 @@ class Grade(threading.Thread):
         self._pointsDeductedPerCollision: float = gradeConfig["costPointsPerCollision"]
         self._costPointsPerSec: float = gradeConfig["costPointsPerSec"]
 
+        # Object of thread, which when started will have the image analysis of Yolo of the current frame in video, which can be requested
+        self._yoloResults = ThreadSafeResults()
+        self._yoloDetectionThreadObj = YoloDetection(self._yoloResults)
+
+        # Object of thread, which when started will analyze aruco codes of the current frame in video, which can be requested
+        self._arucoResults = ThreadSafeResults()
+        self._arucoDetectionThreadObj = ArucoDetection(self._arucoResults)
+
         # Util variables
         currTime = time.time()
         self._timeSinceLastSec = currTime
@@ -55,6 +65,7 @@ class Grade(threading.Thread):
         Method to be called when the thread should be stopped (stop itself)
         :return: 
         """""
+        self._yoloDetectionThreadObj.stop()
         self._stop_event.set()
 
     def stopped(self):
@@ -78,6 +89,7 @@ class Grade(threading.Thread):
             self._handleDecreaseGradeEachSec(currTime)
             self._handleEndSimulationTime(startTime, currTime)
             self._handleCollision(currTime, int(droneState["collisionCount"]))
+            self._handleImageFromUE()
             currTime = time.time()  # Update current time
 
     def _handleEndSimulationTime(self, startTime: float, currTime: float):
@@ -112,3 +124,20 @@ class Grade(threading.Thread):
                 self._timeSinceLastCollision = currTime
                 self._lastCollisionCount = collisionCount
                 self._logger.info(f"Collision Occurred! current points: {self._currentPoints} points")  # Logging
+
+    def _handleImageFromUE(self):
+        if not self._yoloDetectionThreadObj.is_running():  # If the yolo thread is not yet running, run it
+            self._yoloDetectionThreadObj.run()
+        if not self._arucoDetectionThreadObj.is_running():  # If the aruco thread is not yet running, run it
+            self._arucoDetectionThreadObj.run()
+
+        yoloLatestResults = self._yoloResults.get_latest_results()  # get results of yolo detection (request results)
+        self._logger.info("Yolo detection: " + str(yoloLatestResults))  # log results
+        # TODO: add handling of seen objects.
+
+        arucoLatestResults = self._arucoResults.get_latest_results()  # get results of aruco codes detection (request results)
+        self._logger.info("Yolo detection: " + str(arucoLatestResults))  # log results
+        # TODO: add handling of seen aruco codes.
+
+
+
