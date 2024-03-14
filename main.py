@@ -73,6 +73,9 @@ if __name__ == '__main__':
             publicDroneControl.moveDroneDown(1)
         if keyboard.is_pressed('esc'):
             break
+
+        if keyboard.is_pressed('1'):
+            print(publicDroneControl.getCameraTarget())
         time.sleep(0.01)  # small delay to prevent hogging the CPU
 
     #  ----------------------------------------------------------------

@@ -201,3 +201,28 @@ class PublicDroneControl:
         self.send(msg)
         returnMsg = self.udp_socketRecv.recv(1024).decode("utf-8")  # Received distance from UE in UE units, e.g. centimeters. Have to convert to meters
         return float(returnMsg) / 100  # Converting to meters
+
+    def getCameraTarget(self) -> tuple[str, str, tuple[float, float, float]]:
+        """
+        This function is used to get the location of the nearest object in the direction of where the camera is facing
+        :return:    Display name of target,
+                    Class name of target,
+                    Location of target (in X, Y, Z coordinates in UE units)
+        """
+        msg = '{"getCameraTarget": "true"}'
+        self.send(msg)
+        returnMsg = self.udp_socketRecv.recv(1024).decode("utf-8")
+        # Received string in the form: 'DisplayName=Cube ClassName=StaticMeshActor Location=X=19410.000 Y=33114.466 Z=98.913'
+
+        parts = returnMsg.split()  # Splitting the message by spaces to get each part
+
+        # Extract DisplayName and ClassName directly
+        display_name = parts[0].split('=')[1]
+        class_name = parts[1].split('=')[1]
+
+        # Parse the X, Y, Z values from the rest of the string
+        x = float(parts[2].split('=')[2])
+        y = float(parts[3].split('=')[1])
+        z = float(parts[4].split('=')[1])
+
+        return display_name, class_name, (x, y, z)

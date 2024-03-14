@@ -133,11 +133,11 @@ class Grade(threading.Thread):
 
         yoloLatestResults = self._yoloResults.get_latest_results()  # get results of yolo detection (request results)
         self._logger.info("Yolo detection: " + str(yoloLatestResults))  # log results
-        # TODO: add handling of seen objects.
+        # TODO: add handling of seen objects. If not needed then remove previous 2 lines.
 
         arucoLatestResults = self._arucoResults.get_latest_results()  # get results of aruco codes detection (request results)
         self._logger.info("Yolo detection: " + str(arucoLatestResults))  # log results
-        # TODO: add handling of seen aruco codes.
+        # TODO: add handling of seen aruco codes. If not needed then remove previous 2 lines.
 
 
 
