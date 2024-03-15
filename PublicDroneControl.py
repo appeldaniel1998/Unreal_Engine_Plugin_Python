@@ -226,3 +226,15 @@ class PublicDroneControl:
         z = float(parts[4].split('=')[1])
 
         return display_name, class_name, (x, y, z)
+
+    #  End Primitive Controls ---------------------------------------------------
+
+    #  Map Controls -------------------------------------------------------------
+
+    def requestDaytimeChange(self, addDegrees: float) -> None:
+        """
+        This function is used to request a change in the time of day in the simulation.
+        :param addDegrees: add this number of degrees to the current positioning of the sun (direction of the light)
+        """
+        msg = '{"DaytimeChangeRequested": ' + str(addDegrees) + '}'
+        self.send(msg)

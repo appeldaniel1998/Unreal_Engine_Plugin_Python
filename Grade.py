@@ -66,6 +66,7 @@ class Grade(threading.Thread):
         :return: 
         """""
         self._yoloDetectionThreadObj.stop()
+        self._arucoDetectionThreadObj.stop()
         self._stop_event.set()
 
     def stopped(self):

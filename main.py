@@ -76,6 +76,8 @@ if __name__ == '__main__':
 
         if keyboard.is_pressed('1'):
             print(publicDroneControl.getCameraTarget())
+        if keyboard.is_pressed('2'):
+            publicDroneControl.requestDaytimeChange(10)
         time.sleep(0.01)  # small delay to prevent hogging the CPU
 
     #  ----------------------------------------------------------------
