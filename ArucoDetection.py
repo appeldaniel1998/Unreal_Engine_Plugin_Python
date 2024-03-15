@@ -68,7 +68,7 @@ class ArucoDetection(threading.Thread):
                 self.latest_results.update_results((corners, ids, rejected))
 
             else:
-                print("Failed to capture frame")
+                print("Aruco: Failed to capture frame")
 
         # Release the VideoCapture object
         cap.release()
