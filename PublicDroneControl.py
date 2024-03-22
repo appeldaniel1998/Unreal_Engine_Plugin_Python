@@ -2,6 +2,22 @@ import json
 import socket
 
 
+def parseHitResult(returnMsg: str) -> tuple[str, str, tuple[float, float, float]] or None:
+    if returnMsg == 'None':
+        return None
+
+    parts = returnMsg.split()  # Splitting the message by spaces to get each part
+
+    # Extract DisplayName and ClassName directly
+    display_name = parts[0].split('=')[1]
+    class_name = parts[1].split('=')[1]
+
+    # Parse the X, Y, Z values from the rest of the string
+    x = float(parts[2].split('=')[2])
+    y = float(parts[3].split('=')[1])
+    z = float(parts[4].split('=')[1])
+
+
 class PublicDroneControl:
     def __init__(self, ip, port):
         """
@@ -15,6 +31,8 @@ class PublicDroneControl:
 
         self.udp_socketSend = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)  # sender socket (UDP) opened
         self.ip_portSend = (ip, port + 1)
+
+        self.spawnedActors = []
 
     def send(self, msg: str) -> None:
         """
@@ -166,11 +184,13 @@ class PublicDroneControl:
         else:
             turnWithMove = "false"
 
-        msg = '{"controls": {"goto": {"gotoXVal": ' + str(x) + ', "gotoYVal": ' + str(y) + ', "gotoZVal": ' + str(z) + ', "gotoSpeed": ' + str(
-            speed) + ', "turnWithMove": ' + turnWithMove + '}}}'
+        msg = ('{"controls": {"goto": {"gotoXVal": ' + str(x) + ', "gotoYVal": ' + str(y) + ', "gotoZVal": ' + str(z) + ', "gotoSpeed": ' +
+               str(speed) + ', "turnWithMove": ' + turnWithMove + '}}}')
         self.send(msg)
 
     #  End Advanced Controls ----------------------------------------------------
+
+    #  Drone Vision -------------------------------------------------------------
 
     def getDroneState(self) -> json:
         """
@@ -202,9 +222,9 @@ class PublicDroneControl:
         returnMsg = self.udp_socketRecv.recv(1024).decode("utf-8")  # Received distance from UE in UE units, e.g. centimeters. Have to convert to meters
         return float(returnMsg) / 100  # Converting to meters
 
-    def getCameraTarget(self) -> tuple[str, str, tuple[float, float, float]]:
+    def getCameraTarget(self) -> tuple[str, str, tuple[float, float, float]] or None:
         """
-        This function is used to get the location of the nearest object in the direction of where the camera is facing
+        This function is used to get the information regarding the nearest object in the direction of where the camera is facing
         :return:    Display name of target,
                     Class name of target,
                     Location of target (in X, Y, Z coordinates in UE units)
@@ -212,22 +232,27 @@ class PublicDroneControl:
         msg = '{"getCameraTarget": "true"}'
         self.send(msg)
         returnMsg = self.udp_socketRecv.recv(1024).decode("utf-8")
-        # Received string in the form: 'DisplayName=Cube ClassName=StaticMeshActor Location=X=19410.000 Y=33114.466 Z=98.913'
+        # Received string in the form: 'DisplayName=Cube ClassName=StaticMeshActor Location=X=19410.000 Y=33114.466 Z=98.913' or 'None' if no target is detected
+        return parseHitResult(returnMsg)
 
-        parts = returnMsg.split()  # Splitting the message by spaces to get each part
+    def getTargetOfPoint(self, coordinateX: float, coordinateY: float) -> tuple[str, str, tuple[float, float, float]] or None:
+        """
+        This function is used to get the information regarding the nearest object in the direction of a set of coordinates on screen (in 2D space).
+        UE parses this into 3D space and returns the relevant information.
+        The coordinates passed should be of the simulation only, without borders or any blank spaces
+        :param coordinateX: Normalized X coordinate in 2D space of the simulation (on screen)
+        :param coordinateY: Normalized Y coordinate in 2D space of the simulation (on screen)
+        :return:    Display name of target,
+                    Class name of target,
+                    Location of target (in X, Y, Z coordinates in UE units)
+        """
+        msg = ('{"GetTargetOfPoint": {"xVal": ' + str(coordinateX) + ', "yVal": ' + str(coordinateY) + '}}')
+        self.send(msg)
+        returnMsg = self.udp_socketRecv.recv(1024).decode("utf-8")
+        # Received string in the form: 'DisplayName=Cube ClassName=StaticMeshActor Location=X=19410.000 Y=33114.466 Z=98.913' or 'None' if no target is detected
+        return parseHitResult(returnMsg)
 
-        # Extract DisplayName and ClassName directly
-        display_name = parts[0].split('=')[1]
-        class_name = parts[1].split('=')[1]
-
-        # Parse the X, Y, Z values from the rest of the string
-        x = float(parts[2].split('=')[2])
-        y = float(parts[3].split('=')[1])
-        z = float(parts[4].split('=')[1])
-
-        return display_name, class_name, (x, y, z)
-
-    #  End Primitive Controls ---------------------------------------------------
+    #  End Drone Vision ---------------------------------------------------------
 
     #  Map Controls -------------------------------------------------------------
 
@@ -238,3 +263,49 @@ class PublicDroneControl:
         """
         msg = '{"DaytimeChangeRequested": ' + str(addDegrees) + '}'
         self.send(msg)
+
+    def spawnXActors(self, numOfActorsToSpawn: int) -> list[tuple[int, int, int]] or None:
+        """
+        The method should be called at start of simulation
+        This method spawns people NPC in the simulation, where numOfActorsToSpawn is the number of actors which will be spawned randomly.
+        All NPC are randomized in their appearance (male/female/skin and body types/clothing)
+        :param numOfActorsToSpawn: The number of actors which will be spawned randomly (max value is 150)
+        :return: Returns the list locations (x, y, z coordinates) of the spawned actors.
+        """
+        if numOfActorsToSpawn > 150:
+            return
+        msg = '{"SpawnXActors": ' + str(numOfActorsToSpawn) + '}'
+        self.send(msg)
+        returnMsg = self.udp_socketRecv.recv(1024).decode("utf-8")
+
+        jsonObjFromMsg = json.loads(returnMsg)
+
+        # Parse the JSON data into a list of tuples
+        coordinates = []
+        for i in range(len(jsonObjFromMsg) // 3):
+            x = jsonObjFromMsg[f"{i}-XLoc"]
+            y = jsonObjFromMsg[f"{i}-YLoc"]
+            z = jsonObjFromMsg[f"{i}-ZLoc"]
+            coordinates.append((x, y, z))
+
+        self.spawnedActors = coordinates
+        return coordinates
+
+    #  End Map Controls ---------------------------------------------------------
+
+    #  Simulation Methods -------------------------------------------------------
+
+    def verifyAndDestroyActor(self) -> bool:
+        """
+        Method to verify that the camera is currently pointing towards a spawned actor and if verified, remove the actor from the simulation
+        :return: True if verified, false otherwise
+        """
+        cameraTarget = self.getCameraTarget()
+
+        if cameraTarget is not None:  # This is None only when camera is not looking towards any object
+            if cameraTarget[2] in self.spawnedActors:
+                index = self.spawnedActors.index(cameraTarget[2])
+                msg = '{"DestroyActor": ' + str(index) + '}'
+                self.send(msg)
+                return True
+        return False

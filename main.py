@@ -54,6 +54,7 @@ if __name__ == '__main__':
 
     # control the drone from the keyboard -------------------------------
 
+    # publicDroneControl.spawnXActors(20)
     while True:
         if keyboard.is_pressed('w'):
             publicDroneControl.moveDroneForward(1)
@@ -64,9 +65,9 @@ if __name__ == '__main__':
         if keyboard.is_pressed('d'):
             publicDroneControl.moveDroneRight(1)
         if keyboard.is_pressed('q'):
-            publicDroneControl.rotateDroneLeft(1)
+            publicDroneControl.rotateDroneLeft(0.3)
         if keyboard.is_pressed('e'):
-            publicDroneControl.rotateDroneRight(1)
+            publicDroneControl.rotateDroneRight(0.3)
         if keyboard.is_pressed('left shift'):
             publicDroneControl.moveDroneUp(1)
         if keyboard.is_pressed('left ctrl'):
@@ -78,6 +79,10 @@ if __name__ == '__main__':
             print(publicDroneControl.getCameraTarget())
         if keyboard.is_pressed('2'):
             publicDroneControl.requestDaytimeChange(10)
+        if keyboard.is_pressed('3'):
+            publicDroneControl.spawnXActors(20)
+        if keyboard.is_pressed('4'):
+            publicDroneControl.verifyAndDestroyActor()
         time.sleep(0.01)  # small delay to prevent hogging the CPU
 
     #  ----------------------------------------------------------------
