@@ -82,7 +82,7 @@ if __name__ == '__main__':
         if keyboard.is_pressed('3'):
             publicDroneControl.spawnXActors(20)
         if keyboard.is_pressed('4'):
-            publicDroneControl.verifyAndDestroyActor()
+            publicDroneControl.verifyAndDestroyActor(publicDroneControl.getCameraTarget())
         time.sleep(0.01)  # small delay to prevent hogging the CPU
 
     #  ----------------------------------------------------------------

@@ -295,17 +295,19 @@ class PublicDroneControl:
 
     #  Simulation Methods -------------------------------------------------------
 
-    def verifyAndDestroyActor(self) -> bool:
+    def verifyAndDestroyActor(self, target) -> bool:
         """
-        Method to verify that the camera is currently pointing towards a spawned actor and if verified, remove the actor from the simulation
+        Method to verify that the target is a spawned actor, and if verified, remove the actor from the simulation
+        :param target: The returned tuple of the methods: getTargetOfPoint() or getCameraTarget().
+                        The tuple is in the format: tuple[str, str, tuple[float, float, float]]
         :return: True if verified, false otherwise
         """
-        cameraTarget = self.getCameraTarget()
-
-        if cameraTarget is not None:  # This is None only when camera is not looking towards any object
-            if cameraTarget[2] in self.spawnedActors:
-                index = self.spawnedActors.index(cameraTarget[2])
+        if target is not None:  # This is None only when camera is not looking towards any object
+            if target[2] in self.spawnedActors:
+                index = self.spawnedActors.index(target[2])
                 msg = '{"DestroyActor": ' + str(index) + '}'
                 self.send(msg)
                 return True
         return False
+
+    #  End Simulation Methods ---------------------------------------------------
