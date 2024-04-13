@@ -1,8 +1,14 @@
 import json
 import socket
+import threading
+import time
+
+from Core.Coordinate import Coordinate
+from Core.DroneState import DroneState
+from Core.Target import Target
 
 
-def parseHitResult(returnMsg: str) -> tuple[str, str, tuple[float, float, float]] or None:
+def parseHitResult(returnMsg: str) -> Target or None:
     if returnMsg == 'None':
         return None
 
@@ -17,6 +23,8 @@ def parseHitResult(returnMsg: str) -> tuple[str, str, tuple[float, float, float]
     y = float(parts[3].split('=')[1])
     z = float(parts[4].split('=')[1])
 
+    return Target(display_name, class_name, Coordinate(x, y, z))
+
 
 class PublicDroneControl:
     def __init__(self, ip, port):
@@ -25,6 +33,8 @@ class PublicDroneControl:
         :param ip: IP address of the UE engine
         :param port: port number of the UE engine receiver socket (+1 is used for the sender socket)
         """
+        self._lock = threading.Lock()  # To ensure thread-safe operations
+
         ip_portRecv = (ip, port)
         self.udp_socketRecv = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)  # receiver socket (UDP) opened
         self.udp_socketRecv.bind(ip_portRecv)
@@ -34,13 +44,15 @@ class PublicDroneControl:
 
         self.spawnedActors = []
 
-    def send(self, msg: str) -> None:
+    def _send(self, msg: str) -> None:
         """
         This function is used to send a message to the UE engine
         :param msg: message to send to UE engine
         :return: None
         """
-        self.udp_socketSend.sendto(msg.encode('utf-8'), self.ip_portSend)  # Send message to UE
+        with self._lock:
+            self.udp_socketSend.sendto(msg.encode('utf-8'), self.ip_portSend)  # Send message to UE
+            print("Sent message: " + msg)
 
     #  Primitive Controls -------------------------------------------------------
 
@@ -51,7 +63,7 @@ class PublicDroneControl:
         :return: None
         """
         msg = '{"controls": {"upAmount": ' + str(speedMultiplier) + '}}'
-        self.send(msg)
+        self._send(msg)
 
     def moveDroneDown(self, speedMultiplier: float) -> None:
         """
@@ -60,7 +72,7 @@ class PublicDroneControl:
         :return: None
         """
         msg = '{"controls": {"upAmount": ' + str(-speedMultiplier) + '}}'
-        self.send(msg)
+        self._send(msg)
 
     def moveDroneForward(self, speedMultiplier: float) -> None:
         """
@@ -69,7 +81,7 @@ class PublicDroneControl:
         :return: None
         """
         msg = '{"controls": {"pitchForwardAmount": ' + str(speedMultiplier) + '}}'
-        self.send(msg)
+        self._send(msg)
 
     def moveDroneBackward(self, speedMultiplier: float) -> None:
         """
@@ -78,7 +90,7 @@ class PublicDroneControl:
         :return: None
         """
         msg = '{"controls": {"pitchForwardAmount": ' + str(-speedMultiplier) + '}}'
-        self.send(msg)
+        self._send(msg)
 
     def moveDroneRight(self, speedMultiplier: float) -> None:
         """
@@ -87,7 +99,7 @@ class PublicDroneControl:
         :return: None
         """
         msg = '{"controls": {"rollRightAmount": ' + str(speedMultiplier) + '}}'
-        self.send(msg)
+        self._send(msg)
 
     def moveDroneLeft(self, speedMultiplier: float) -> None:
         """
@@ -96,7 +108,7 @@ class PublicDroneControl:
         :return: None
         """
         msg = '{"controls": {"rollRightAmount": ' + str(-speedMultiplier) + '}}'
-        self.send(msg)
+        self._send(msg)
 
     def rotateDroneRight(self, speedMultiplier: float) -> None:
         """
@@ -105,7 +117,7 @@ class PublicDroneControl:
         :return: None
         """
         msg = '{"controls": {"yawRightAmount": ' + str(speedMultiplier) + '}}'
-        self.send(msg)
+        self._send(msg)
 
     def rotateDroneLeft(self, speedMultiplier: float) -> None:
         """
@@ -114,7 +126,7 @@ class PublicDroneControl:
         :return: None
         """
         msg = '{"controls": {"yawRightAmount": ' + str(-speedMultiplier) + '}}'
-        self.send(msg)
+        self._send(msg)
 
     def rotateCameraDown(self, speedMultiplier: float) -> None:
         """
@@ -123,7 +135,7 @@ class PublicDroneControl:
         :return: None
         """
         msg = '{"controls": {"cameraDownAmount": ' + str(speedMultiplier) + '}}'
-        self.send(msg)
+        self._send(msg)
 
     def rotateCameraUp(self, speedMultiplier: float) -> None:
         """
@@ -132,7 +144,7 @@ class PublicDroneControl:
         :return: None
         """
         msg = '{"controls": {"cameraDownAmount": ' + str(-speedMultiplier) + '}}'
-        self.send(msg)
+        self._send(msg)
 
     #  End Primitive Controls ---------------------------------------------------
 
@@ -144,7 +156,7 @@ class PublicDroneControl:
         :return: None
         """
         msg = '{"controls": {"hover": "true"}}'
-        self.send(msg)
+        self._send(msg)
 
     def rotateDroneXDegreesAtSpeed(self, degrees: float, speed: float = 90) -> None:
         """
@@ -154,7 +166,7 @@ class PublicDroneControl:
         :return: None
         """
         msg = '{"controls": {"rotateXDegrees": ' + str(degrees) + ', "rotationSpeed": ' + str(speed) + '}}'
-        self.send(msg)
+        self._send(msg)
 
     def rotateDroneTowardsLocation(self, x: float, y: float, z: float, speed: float = 90) -> None:
         """
@@ -167,7 +179,7 @@ class PublicDroneControl:
         """
         msg = '{"controls": {"turnTowards": {"turnTowardsXVal": ' + str(x) + ', "turnTowardsYVal": ' + str(y) + ', "turnTowardsZVal": ' + str(
             z) + ', "turnTowardsSpeed": ' + str(speed) + '}}}'
-        self.send(msg)
+        self._send(msg)
 
     def moveDroneToLocation(self, x: float, y: float, z: float, speed: float = 2, turnWithMove: bool = True) -> None:
         """
@@ -186,22 +198,29 @@ class PublicDroneControl:
 
         msg = ('{"controls": {"goto": {"gotoXVal": ' + str(x) + ', "gotoYVal": ' + str(y) + ', "gotoZVal": ' + str(z) + ', "gotoSpeed": ' +
                str(speed) + ', "turnWithMove": ' + turnWithMove + '}}}')
-        self.send(msg)
+        self._send(msg)
 
     #  End Advanced Controls ----------------------------------------------------
 
     #  Drone Vision -------------------------------------------------------------
 
-    def getDroneState(self) -> json:
+    def getDroneState(self) -> DroneState or None:
         """
         This function is used to get the current state of the drone
         The state includes the location of the drone (in UE grid coordinates) and the number of collisions up to that point
         :return: None
         """
-        msg = '{"getDroneState": "true"}'
-        self.send(msg)
-        returnMsg = self.udp_socketRecv.recv(1024)  # Receive message from UE
-        return json.loads(returnMsg.decode("utf-8"))
+        try:
+            msg = '{"getDroneState": "true"}'
+            self._send(msg)
+            returnMsg = self.udp_socketRecv.recv(4096)  # Receive message from UE
+            print("Received drone state: ", returnMsg.decode("utf-8"))
+
+            droneStateAsJson = json.loads(returnMsg.decode("utf-8"))
+            return DroneState(Coordinate(droneStateAsJson["positionXVal"], droneStateAsJson["positionYVal"], droneStateAsJson["positionZVal"]), droneStateAsJson["collisionCount"])
+        except Exception as e:
+            print(f"Error in getDroneState: {e}")
+            return None
 
     def sendDroneGrade(self, grade: float) -> None:
         """
@@ -210,7 +229,7 @@ class PublicDroneControl:
         :return: None
         """
         msg = '{"droneGrade": ' + str(grade) + '}'
-        self.send(msg)
+        self._send(msg)
 
     def getDistanceToCameraDirection(self) -> float:
         """
@@ -218,36 +237,38 @@ class PublicDroneControl:
         :return: distance to nearest object in direction of camera in meters
         """
         msg = '{"getDistanceToCameraDirection": "true"}'
-        self.send(msg)
+        self._send(msg)
         returnMsg = self.udp_socketRecv.recv(1024).decode("utf-8")  # Received distance from UE in UE units, e.g. centimeters. Have to convert to meters
         return float(returnMsg) / 100  # Converting to meters
 
-    def getCameraTarget(self) -> tuple[str, str, tuple[float, float, float]] or None:
+    def getCameraTarget(self) -> Target or None:
         """
         This function is used to get the information regarding the nearest object in the direction of where the camera is facing
-        :return:    Display name of target,
-                    Class name of target,
-                    Location of target (in X, Y, Z coordinates in UE units)
+        :return:    Target object containing:
+                        Display name of target,
+                        Class name of target,
+                        Location of target (in X, Y, Z coordinates in UE units)
         """
         msg = '{"getCameraTarget": "true"}'
-        self.send(msg)
+        self._send(msg)
         returnMsg = self.udp_socketRecv.recv(1024).decode("utf-8")
         # Received string in the form: 'DisplayName=Cube ClassName=StaticMeshActor Location=X=19410.000 Y=33114.466 Z=98.913' or 'None' if no target is detected
         return parseHitResult(returnMsg)
 
-    def getTargetOfPoint(self, coordinateX: float, coordinateY: float) -> tuple[str, str, tuple[float, float, float]] or None:
+    def getTargetOfPoint(self, coordinateX: float, coordinateY: float) -> Target or None:
         """
         This function is used to get the information regarding the nearest object in the direction of a set of coordinates on screen (in 2D space).
         UE parses this into 3D space and returns the relevant information.
         The coordinates passed should be of the simulation only, without borders or any blank spaces
         :param coordinateX: Normalized X coordinate in 2D space of the simulation (on screen)
         :param coordinateY: Normalized Y coordinate in 2D space of the simulation (on screen)
-        :return:    Display name of target,
-                    Class name of target,
-                    Location of target (in X, Y, Z coordinates in UE units)
+        :return:    Target object containing:
+                        Display name of target,
+                        Class name of target,
+                        Location of target (in X, Y, Z coordinates in UE units)
         """
         msg = ('{"GetTargetOfPoint": {"xVal": ' + str(coordinateX) + ', "yVal": ' + str(coordinateY) + '}}')
-        self.send(msg)
+        self._send(msg)
         returnMsg = self.udp_socketRecv.recv(1024).decode("utf-8")
         # Received string in the form: 'DisplayName=Cube ClassName=StaticMeshActor Location=X=19410.000 Y=33114.466 Z=98.913' or 'None' if no target is detected
         return parseHitResult(returnMsg)
@@ -262,7 +283,7 @@ class PublicDroneControl:
         :param addDegrees: add this number of degrees to the current positioning of the sun (direction of the light)
         """
         msg = '{"DaytimeChangeRequested": ' + str(addDegrees) + '}'
-        self.send(msg)
+        self._send(msg)
 
     def spawnXActors(self, numOfActorsToSpawn: int) -> list[tuple[int, int, int]] or None:
         """
@@ -272,11 +293,15 @@ class PublicDroneControl:
         :param numOfActorsToSpawn: The number of actors which will be spawned randomly (max value is 150)
         :return: Returns the list locations (x, y, z coordinates) of the spawned actors.
         """
+
         if numOfActorsToSpawn > 150:
-            return
+            numOfActorsToSpawn = 150
         msg = '{"SpawnXActors": ' + str(numOfActorsToSpawn) + '}'
-        self.send(msg)
-        returnMsg = self.udp_socketRecv.recv(1024).decode("utf-8")
+        self._send(msg)
+        print("Sent message to spawn actors")
+        time.sleep(0.2)
+        returnMsg = self.udp_socketRecv.recv(4096).decode("utf-8")
+        print("Actors received")
 
         jsonObjFromMsg = json.loads(returnMsg)
 
@@ -286,7 +311,7 @@ class PublicDroneControl:
             x = jsonObjFromMsg[f"{i}-XLoc"]
             y = jsonObjFromMsg[f"{i}-YLoc"]
             z = jsonObjFromMsg[f"{i}-ZLoc"]
-            coordinates.append((x, y, z))
+            coordinates.append(Coordinate(x, y, z))
 
         self.spawnedActors = coordinates
         return coordinates
@@ -295,18 +320,19 @@ class PublicDroneControl:
 
     #  Simulation Methods -------------------------------------------------------
 
-    def verifyAndDestroyActor(self, target) -> bool:
+    def verifyAndDestroyActorFromCamera(self) -> bool:
         """
         Method to verify that the target is a spawned actor, and if verified, remove the actor from the simulation
-        :param target: The returned tuple of the methods: getTargetOfPoint() or getCameraTarget().
-                        The tuple is in the format: tuple[str, str, tuple[float, float, float]]
+
         :return: True if verified, false otherwise
         """
+        target = self.getCameraTarget()
+
         if target is not None:  # This is None only when camera is not looking towards any object
-            if target[2] in self.spawnedActors:
-                index = self.spawnedActors.index(target[2])
+            if target.position in self.spawnedActors:
+                index = self.spawnedActors.index(target.position)  # Get the index of the actor in the list
                 msg = '{"DestroyActor": ' + str(index) + '}'
-                self.send(msg)
+                self._send(msg)
                 return True
         return False
 

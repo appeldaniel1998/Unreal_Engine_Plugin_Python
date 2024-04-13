@@ -2,7 +2,7 @@ import threading
 import cv2
 from cv2 import aruco
 
-from ThreadSafeResults import ThreadSafeResults
+from AI.ThreadSafeResults import ThreadSafeResults
 
 
 class ArucoDetection(threading.Thread):

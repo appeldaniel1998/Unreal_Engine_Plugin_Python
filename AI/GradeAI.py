@@ -1,15 +1,16 @@
 import json
 import threading
 import time
+from pathlib import Path
 
-import Logger
-from ArucoDetection import ArucoDetection
-from PublicDroneControl import PublicDroneControl
+from Core import Logger
+from AI.ArucoDetection import ArucoDetection
+from Core.PublicDroneControl import PublicDroneControl
 from YoloImpl.MainYoloDetect import YoloDetection
-from ThreadSafeResults import ThreadSafeResults
+from AI.ThreadSafeResults import ThreadSafeResults
 
 
-class Grade(threading.Thread):
+class GradeAI(threading.Thread):
     """
     Class to represent the thread which is to handle all grading-related issues of the drone for its Reinforcement Learning.
     Required functionality:
@@ -37,7 +38,11 @@ class Grade(threading.Thread):
 
         self._logger = logger  # Logger to file
 
-        gradeConfig = json.load(open("ConfigFiles/GradeConfig.json", "r"))  # Reading gradeConfig JSON from file
+        current_script_path = Path(__file__).resolve()  # Get the path of the current script
+        root_path = current_script_path.parent.parent  # Navigate to the root directory. Adjust the number of .parent based on your directory structure
+        config_path = root_path / 'ConfigFiles' / 'gradeConfig.json'  # Construct the full path to the configuration file
+        gradeConfig = json.load(open(config_path, "r"))  # Reading gradeConfig JSON from file
+
         # Load parameters from JSON
         self._currentPoints: float = gradeConfig["pointsAtStartOfGame"]
         self._simulationTime: float = gradeConfig["simulationTime"]  # In seconds

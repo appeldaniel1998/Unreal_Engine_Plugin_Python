@@ -1,25 +1,24 @@
-import json
-
-from Logger import LoggerThread
-from PublicDroneControl import PublicDroneControl
+from Core.Logger import LoggerThread
+from Core.PublicDroneControl import PublicDroneControl
 import keyboard
 import time
-from Grade import Grade
+from AI.GradeAI import GradeAI
 from datetime import datetime
 
 if __name__ == '__main__':
 
-    # Create a logger
-    logger = LoggerThread("logs\\log_" + datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))  # Create a logger thread
+    # logger = LoggerThread("logs\\log_" + datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))  # Create a logger thread
 
     publicDroneControl = PublicDroneControl("127.0.0.1", 3001)  # Create an instance of PublicDroneControl
-
+    print("PublicDroneControl created")
     # Initialize lastTime
     startTime = time.time()  # Store the initial time
+    publicDroneControl.spawnXActors(20)
+    print("Actors spawned")
 
     # Create and start the Grade thread
-    grade = Grade(logger, publicDroneControl)
-    grade.start()
+    # grade = GradeAI(logger, publicDroneControl)
+    # grade.start()
 
     # # Moving the drone on a graph --------------------------------------
     #
@@ -55,6 +54,7 @@ if __name__ == '__main__':
     # control the drone from the keyboard -------------------------------
 
     # publicDroneControl.spawnXActors(20)
+    print("Listening for keyboard input...")
     while True:
         if keyboard.is_pressed('w'):
             publicDroneControl.moveDroneForward(1)
@@ -81,8 +81,8 @@ if __name__ == '__main__':
             publicDroneControl.requestDaytimeChange(10)
         if keyboard.is_pressed('3'):
             publicDroneControl.spawnXActors(20)
-        if keyboard.is_pressed('4'):
-            publicDroneControl.verifyAndDestroyActor(publicDroneControl.getCameraTarget())
+        # if keyboard.is_pressed('4'):
+        #     publicDroneControl.verifyAndDestroyActor(publicDroneControl.getCameraTarget())
         time.sleep(0.01)  # small delay to prevent hogging the CPU
 
     #  ----------------------------------------------------------------

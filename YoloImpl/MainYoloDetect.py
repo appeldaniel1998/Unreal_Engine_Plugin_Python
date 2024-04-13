@@ -35,7 +35,7 @@ import sys
 import threading
 from pathlib import Path
 import torch
-from ThreadSafeResults import ThreadSafeResults
+from AI.ThreadSafeResults import ThreadSafeResults
 from ultralytics.utils.plotting import Annotator, colors, save_one_box
 
 from YoloImpl.models.common import DetectMultiBackend
