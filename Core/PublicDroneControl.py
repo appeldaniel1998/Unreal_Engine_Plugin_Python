@@ -2,17 +2,18 @@ import json
 import socket
 import threading
 import time
+import re
 
 from Core.Coordinate import Coordinate
 from Core.DroneState import DroneState
 from Core.Target import Target
 
 
-def parseHitResult(returnMsg: str) -> Target or None:
-    if returnMsg == 'None':
+def parseHitResult(hitResultMsg: str) -> Target or None:
+    if hitResultMsg == 'None':
         return None
 
-    parts = returnMsg.split()  # Splitting the message by spaces to get each part
+    parts = hitResultMsg.split()  # Splitting the message by spaces to get each part
 
     # Extract DisplayName and ClassName directly
     display_name = parts[0].split('=')[1]
@@ -24,6 +25,15 @@ def parseHitResult(returnMsg: str) -> Target or None:
     z = float(parts[4].split('=')[1])
 
     return Target(display_name, class_name, Coordinate(x, y, z))
+
+
+def _validate_target_format(input_string):
+    pattern = r"^DisplayName=([\w\s]+)\s+ClassName=([\w\s]+)\s+Location=X=(-?\d+\.?\d*)\s+Y=(-?\d+\.?\d*)\s+Z=(-?\d+\.?\d*)$"
+    match = re.match(pattern, input_string)
+    if match:
+        return True
+    else:
+        return False
 
 
 class PublicDroneControl:
@@ -52,7 +62,6 @@ class PublicDroneControl:
         """
         with self._lock:
             self.udp_socketSend.sendto(msg.encode('utf-8'), self.ip_portSend)  # Send message to UE
-            print("Sent message: " + msg)
 
     #  Primitive Controls -------------------------------------------------------
 
@@ -213,13 +222,10 @@ class PublicDroneControl:
         try:
             msg = '{"getDroneState": "true"}'
             self._send(msg)
-            returnMsg = self.udp_socketRecv.recv(4096)  # Receive message from UE
-            print("Received drone state: ", returnMsg.decode("utf-8"))
-
-            droneStateAsJson = json.loads(returnMsg.decode("utf-8"))
+            droneStateStr = self.udp_socketRecv.recv(4096).decode("utf-8")  # Receive message from UE
+            droneStateAsJson = json.loads(droneStateStr)
             return DroneState(Coordinate(droneStateAsJson["positionXVal"], droneStateAsJson["positionYVal"], droneStateAsJson["positionZVal"]), droneStateAsJson["collisionCount"])
         except Exception as e:
-            print(f"Error in getDroneState: {e}")
             return None
 
     def sendDroneGrade(self, grade: float) -> None:
@@ -238,8 +244,8 @@ class PublicDroneControl:
         """
         msg = '{"getDistanceToCameraDirection": "true"}'
         self._send(msg)
-        returnMsg = self.udp_socketRecv.recv(1024).decode("utf-8")  # Received distance from UE in UE units, e.g. centimeters. Have to convert to meters
-        return float(returnMsg) / 100  # Converting to meters
+        distanceToCameraDirectionStr = self.udp_socketRecv.recv(1024).decode("utf-8")  # Received distance from UE in UE units, e.g. centimeters. Have to convert to meters
+        return float(distanceToCameraDirectionStr) / 100  # Converting to meters
 
     def getCameraTarget(self) -> Target or None:
         """
@@ -251,9 +257,11 @@ class PublicDroneControl:
         """
         msg = '{"getCameraTarget": "true"}'
         self._send(msg)
-        returnMsg = self.udp_socketRecv.recv(1024).decode("utf-8")
+        cameraTargetString = self.udp_socketRecv.recv(1024).decode("utf-8")
+        if not _validate_target_format(cameraTargetString):
+            return None
         # Received string in the form: 'DisplayName=Cube ClassName=StaticMeshActor Location=X=19410.000 Y=33114.466 Z=98.913' or 'None' if no target is detected
-        return parseHitResult(returnMsg)
+        return parseHitResult(cameraTargetString)
 
     def getTargetOfPoint(self, coordinateX: float, coordinateY: float) -> Target or None:
         """
@@ -269,9 +277,9 @@ class PublicDroneControl:
         """
         msg = ('{"GetTargetOfPoint": {"xVal": ' + str(coordinateX) + ', "yVal": ' + str(coordinateY) + '}}')
         self._send(msg)
-        returnMsg = self.udp_socketRecv.recv(1024).decode("utf-8")
+        targetOfPointString = self.udp_socketRecv.recv(1024).decode("utf-8")
         # Received string in the form: 'DisplayName=Cube ClassName=StaticMeshActor Location=X=19410.000 Y=33114.466 Z=98.913' or 'None' if no target is detected
-        return parseHitResult(returnMsg)
+        return parseHitResult(targetOfPointString)
 
     #  End Drone Vision ---------------------------------------------------------
 
@@ -300,17 +308,17 @@ class PublicDroneControl:
         self._send(msg)
         print("Sent message to spawn actors")
         time.sleep(0.2)
-        returnMsg = self.udp_socketRecv.recv(4096).decode("utf-8")
+        actorLocationsString = self.udp_socketRecv.recv(4096).decode("utf-8")
         print("Actors received")
 
-        jsonObjFromMsg = json.loads(returnMsg)
+        actorLocationsStringJson = json.loads(actorLocationsString)
 
         # Parse the JSON data into a list of tuples
         coordinates = []
-        for i in range(len(jsonObjFromMsg) // 3):
-            x = jsonObjFromMsg[f"{i}-XLoc"]
-            y = jsonObjFromMsg[f"{i}-YLoc"]
-            z = jsonObjFromMsg[f"{i}-ZLoc"]
+        for i in range(len(actorLocationsStringJson) // 3):
+            x = actorLocationsStringJson[f"{i}-XLoc"]
+            y = actorLocationsStringJson[f"{i}-YLoc"]
+            z = actorLocationsStringJson[f"{i}-ZLoc"]
             coordinates.append(Coordinate(x, y, z))
 
         self.spawnedActors = coordinates
@@ -328,12 +336,13 @@ class PublicDroneControl:
         """
         target = self.getCameraTarget()
 
-        if target is not None:  # This is None only when camera is not looking towards any object
-            if target.position in self.spawnedActors:
-                index = self.spawnedActors.index(target.position)  # Get the index of the actor in the list
-                msg = '{"DestroyActor": ' + str(index) + '}'
-                self._send(msg)
-                return True
+        for i in range(10):
+            if target is not None:  # This is None only when camera is not looking towards any object
+                if target.position in self.spawnedActors:
+                    index = self.spawnedActors.index(target.position)  # Get the index of the actor in the list
+                    msg = '{"DestroyActor": ' + str(index) + '}'
+                    self._send(msg)
+                    return True
         return False
 
     #  End Simulation Methods ---------------------------------------------------

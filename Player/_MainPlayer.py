@@ -19,12 +19,11 @@ if __name__ == '__main__':
     grade = GradePlayer(publicDroneControl, logger, 60)  # Duration in seconds
     grade.start()
 
-    player_control_thread = PlayerControlThread(publicDroneControl=publicDroneControl, logger=logger)
+    player_control_thread = PlayerControlThread(publicDroneControl=publicDroneControl, logger=logger, gradeThread=grade)
     player_control_thread.start()
 
     try:
         while True:
-            print("Main loop running...")
             # Perform periodic checks or log statuses
             if not player_control_thread.is_alive():
                 print("Player control thread has stopped.")

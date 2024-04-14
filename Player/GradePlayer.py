@@ -63,7 +63,7 @@ class GradePlayer(threading.Thread):
 
     def _handleCollisions(self):
         state: DroneState = self.publicDroneControl.getDroneState()
-        if state.collisionCount != 0:
+        if state is not None and state.collisionCount != 0:
             self.points -= self.pointsDeductedForCollision
             self.logger.info(f"Collision detected. Points deducted: {self.pointsDeductedForCollision}")
             self.stop()  # Stop the thread if a collision is detected and end simulation
