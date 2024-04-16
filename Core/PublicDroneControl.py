@@ -1,12 +1,19 @@
 import json
 import socket
 import threading
-import time
-import re
+from queue import Queue
 
 from Core.Coordinate import Coordinate
 from Core.DroneState import DroneState
 from Core.Target import Target
+
+
+def extractMessageFromPrefix(prefix, message):
+    # Split the message at the prefix and get the remainder
+    parts = message.split(prefix, 1)  # The second argument '1' ensures splitting is done only once
+    if len(parts) > 1:
+        return parts[1]  # Return the part after the prefix
+    return None  # Return None if the prefix is not found
 
 
 def parseHitResult(hitResultMsg: str) -> Target or None:
@@ -27,12 +34,21 @@ def parseHitResult(hitResultMsg: str) -> Target or None:
     return Target(display_name, class_name, Coordinate(x, y, z))
 
 
-def _validate_target_format(input_string):
-    pattern = r"^DisplayName=([\w\s]+)\s+ClassName=([\w\s]+)\s+Location=X=(-?\d+\.?\d*)\s+Y=(-?\d+\.?\d*)\s+Z=(-?\d+\.?\d*)$"
-    match = re.match(pattern, input_string)
-    if match:
-        return True
-    else:
+def _validate_target_format(input_string: str) -> bool:
+    try:
+        # Attempt to parse the JSON string
+        jsonData = json.loads(input_string)
+
+        # Check for the presence and type of each required key
+        if isinstance(jsonData.get("collisionCount"), int) and \
+                isinstance(jsonData.get("positionXVal"), float) and \
+                isinstance(jsonData.get("positionYVal"), float) and \
+                isinstance(jsonData.get("positionZVal"), float):
+            return True
+        else:
+            return False
+    except json.JSONDecodeError:
+        # If JSON decoding fails, the string is not in valid JSON format
         return False
 
 
@@ -43,16 +59,39 @@ class PublicDroneControl:
         :param ip: IP address of the UE engine
         :param port: port number of the UE engine receiver socket (+1 is used for the sender socket)
         """
-        self._lock = threading.Lock()  # To ensure thread-safe operations
-
-        ip_portRecv = (ip, port)
-        self.udp_socketRecv = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)  # receiver socket (UDP) opened
-        self.udp_socketRecv.bind(ip_portRecv)
-
-        self.udp_socketSend = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)  # sender socket (UDP) opened
+        self.udp_socketRecv = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.udp_socketRecv.bind((ip, port))
+        self.udp_socketSend = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.ip_portSend = (ip, port + 1)
 
+        self.message_queues = {
+            'getDroneState': Queue(),
+            'getDistanceToCameraDirection': Queue(),
+            'getCameraTarget': Queue(),
+            'SpawnXActors': Queue(),
+            'GetTargetOfPoint': Queue()
+        }
+
+        self.listener_thread = threading.Thread(target=self._listen)
+        self.listener_thread.daemon = True
+        self.listener_thread.start()
+
         self.spawnedActors = []
+
+    def _listen(self):
+        while True:
+            data, _ = self.udp_socketRecv.recvfrom(4096)
+            message = data.decode('utf-8')
+            if 'getDroneState:' in message:
+                self.message_queues['getDroneState'].put(extractMessageFromPrefix('getDroneState:', message))
+            elif 'getDistanceToCameraDirection:' in message:
+                self.message_queues['getDistanceToCameraDirection'].put(extractMessageFromPrefix('getDistanceToCameraDirection:', message))
+            elif 'getCameraTarget:' in message:
+                self.message_queues['getCameraTarget'].put(extractMessageFromPrefix('getCameraTarget:', message))
+            elif 'SpawnXActors:' in message:
+                self.message_queues['SpawnXActors'].put(extractMessageFromPrefix('SpawnXActors:', message))
+            elif 'GetTargetOfPoint:' in message:
+                self.message_queues['GetTargetOfPoint'].put(extractMessageFromPrefix('GetTargetOfPoint:', message))
 
     def _send(self, msg: str) -> None:
         """
@@ -60,8 +99,7 @@ class PublicDroneControl:
         :param msg: message to send to UE engine
         :return: None
         """
-        with self._lock:
-            self.udp_socketSend.sendto(msg.encode('utf-8'), self.ip_portSend)  # Send message to UE
+        self.udp_socketSend.sendto(msg.encode('utf-8'), self.ip_portSend)  # Send the message to the UE engine
 
     #  Primitive Controls -------------------------------------------------------
 
@@ -213,20 +251,20 @@ class PublicDroneControl:
 
     #  Drone Vision -------------------------------------------------------------
 
-    def getDroneState(self) -> DroneState or None:
+    def getDroneState(self) -> DroneState:
         """
         This function is used to get the current state of the drone
         The state includes the location of the drone (in UE grid coordinates) and the number of collisions up to that point
         :return: None
         """
-        try:
-            msg = '{"getDroneState": "true"}'
-            self._send(msg)
-            droneStateStr = self.udp_socketRecv.recv(4096).decode("utf-8")  # Receive message from UE
-            droneStateAsJson = json.loads(droneStateStr)
-            return DroneState(Coordinate(droneStateAsJson["positionXVal"], droneStateAsJson["positionYVal"], droneStateAsJson["positionZVal"]), droneStateAsJson["collisionCount"])
-        except Exception as e:
-            return None
+        msg = '{"getDroneState": "true"}'
+        self._send(msg)
+        message = self.message_queues['getDroneState'].get()  # This will block until an item is available
+        json_message = json.loads(message)
+        return DroneState(
+            Coordinate(json_message["positionXVal"], json_message["positionYVal"], json_message["positionZVal"]),
+            json_message["collisionCount"]
+        )
 
     def sendDroneGrade(self, grade: float) -> None:
         """
@@ -244,8 +282,10 @@ class PublicDroneControl:
         """
         msg = '{"getDistanceToCameraDirection": "true"}'
         self._send(msg)
-        distanceToCameraDirectionStr = self.udp_socketRecv.recv(1024).decode("utf-8")  # Received distance from UE in UE units, e.g. centimeters. Have to convert to meters
-        return float(distanceToCameraDirectionStr) / 100  # Converting to meters
+
+        # Receiving distance from UE in UE units, e.g. centimeters. Have to convert to meters
+        message = self.message_queues['getDistanceToCameraDirection'].get()  # This will block until an item is available
+        return float(message) / 100  # Convert to meters
 
     def getCameraTarget(self) -> Target or None:
         """
@@ -257,11 +297,9 @@ class PublicDroneControl:
         """
         msg = '{"getCameraTarget": "true"}'
         self._send(msg)
-        cameraTargetString = self.udp_socketRecv.recv(1024).decode("utf-8")
-        if not _validate_target_format(cameraTargetString):
-            return None
+        message = self.message_queues['getCameraTarget'].get()  # This will block until an item is available
         # Received string in the form: 'DisplayName=Cube ClassName=StaticMeshActor Location=X=19410.000 Y=33114.466 Z=98.913' or 'None' if no target is detected
-        return parseHitResult(cameraTargetString)
+        return parseHitResult(message)
 
     def getTargetOfPoint(self, coordinateX: float, coordinateY: float) -> Target or None:
         """
@@ -277,7 +315,7 @@ class PublicDroneControl:
         """
         msg = ('{"GetTargetOfPoint": {"xVal": ' + str(coordinateX) + ', "yVal": ' + str(coordinateY) + '}}')
         self._send(msg)
-        targetOfPointString = self.udp_socketRecv.recv(1024).decode("utf-8")
+        targetOfPointString = self.message_queues['GetTargetOfPoint'].get()  # Blocks until an item is available
         # Received string in the form: 'DisplayName=Cube ClassName=StaticMeshActor Location=X=19410.000 Y=33114.466 Z=98.913' or 'None' if no target is detected
         return parseHitResult(targetOfPointString)
 
@@ -307,10 +345,7 @@ class PublicDroneControl:
         msg = '{"SpawnXActors": ' + str(numOfActorsToSpawn) + '}'
         self._send(msg)
         print("Sent message to spawn actors")
-        time.sleep(0.2)
-        actorLocationsString = self.udp_socketRecv.recv(4096).decode("utf-8")
-        print("Actors received")
-
+        actorLocationsString = self.message_queues['SpawnXActors'].get()  # Blocks until response is received
         actorLocationsStringJson = json.loads(actorLocationsString)
 
         # Parse the JSON data into a list of tuples

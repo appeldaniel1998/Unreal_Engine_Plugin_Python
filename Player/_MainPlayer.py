@@ -1,12 +1,12 @@
 import time
 
 from Core.Logger import LoggerThread
+# from Core.PublicDroneControl import PublicDroneControl
 from Core.PublicDroneControl import PublicDroneControl
 from Player.GradePlayer import GradePlayer
 from Player.PlayerControlsThread import PlayerControlThread
 
 if __name__ == '__main__':
-    # grade = 0  # Start with 0 points
 
     logger = LoggerThread()  # Create a logger thread
 

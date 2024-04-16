@@ -1,5 +1,4 @@
 import threading
-import time
 import logging
 from datetime import datetime
 from pathlib import Path
