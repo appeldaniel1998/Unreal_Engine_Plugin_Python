@@ -1,7 +1,8 @@
 {
-    "pointsAtStartOfGame": 100,
-    "simulationTime": 30,
-    "pointsForTargetDetection": 10,
-    "costPointsPerSec": 1,
-    "costPointsPerCollision": 50
+    "numOfPeople": 50,
+    "sunAngle": 0.0,
+    "addPointsForRecognition": 5.0,
+    "decreasePointsPerSec": 1.0,
+    "simulationTime": 120,
+    "pointsDeductedForCollision": 1000.0
 }

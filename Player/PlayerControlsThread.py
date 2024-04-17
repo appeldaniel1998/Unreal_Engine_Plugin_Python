@@ -58,8 +58,8 @@ class PlayerControlThread(threading.Thread):
                     self.logger.info("Moving down")
                 if keyboard.is_pressed('space'):
                     if self.publicDroneControl.verifyAndDestroyActorFromCamera():
-                        self.logger.info("Actor detected by player, adding points... current points: " + str(self.gradePlayer.get_points()) + " + 1")
-                        self.gradePlayer.add_points(1)
+                        self.logger.info(f"Actor detected by player, adding points... current points: {self.gradePlayer.get_points() + self.gradePlayer.addPointsForRecognition}")
+                        self.gradePlayer.add_points(self.gradePlayer.addPointsForRecognition)
                     else:
                         self.logger.info("No actor detected by player")
                 if keyboard.is_pressed('esc'):
