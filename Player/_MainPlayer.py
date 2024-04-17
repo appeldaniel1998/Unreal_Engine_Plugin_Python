@@ -1,7 +1,6 @@
 import time
 
 from Core.Logger import LoggerThread
-# from Core.PublicDroneControl import PublicDroneControl
 from Core.PublicDroneControl import PublicDroneControl
 from Player.GradePlayer import GradePlayer
 from Player.PlayerControlsThread import PlayerControlThread
@@ -26,21 +25,28 @@ if __name__ == '__main__':
         while True:
             # Perform periodic checks or log statuses
             if not player_control_thread.is_alive():
-                print("Player control thread has stopped.")
+                logger.info("Player control thread has stopped unexpectedly. Stopping all threads.")
+                grade.stop()
                 break
             if not grade.is_alive():
-                print("Grade thread has stopped.")
+                logger.info("Grade thread has stopped unexpectedly. Stopping all threads.")
+                player_control_thread.stop()
                 break
 
             time.sleep(1)  # Reduce CPU usage
 
     except KeyboardInterrupt:
-        print("Shutting down threads...")
-        # Signal all threads to stop, if you have implemented a stop mechanism.
-        player_control_thread.stop()
-        grade.stop()
+        logger.info("Received KeyboardInterrupt. Shutting down threads...")
+
+    finally:
+        # Ensure all threads are stopped
+        if player_control_thread.is_alive():
+            player_control_thread.stop()
+        if grade.is_alive():
+            grade.stop()
 
         # Now you can safely join since you've signaled them to stop
         player_control_thread.join()
         grade.join()
-        print("All threads stopped cleanly.")
+
+        logger.info("All threads stopped cleanly.")

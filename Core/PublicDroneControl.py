@@ -371,13 +371,14 @@ class PublicDroneControl:
         """
         target = self.getCameraTarget()
 
-        for i in range(10):
-            if target is not None:  # This is None only when camera is not looking towards any object
-                if target.position in self.spawnedActors:
-                    index = self.spawnedActors.index(target.position)  # Get the index of the actor in the list
-                    msg = '{"DestroyActor": ' + str(index) + '}'
-                    self._send(msg)
-                    return True
+        if target is None:
+            return False
+
+        if target.position in self.spawnedActors:
+            index = self.spawnedActors.index(target.position)  # Get the index of the actor in the list
+            msg = '{"DestroyActor": ' + str(index) + '}'
+            self._send(msg)
+            return True
         return False
 
     #  End Simulation Methods ---------------------------------------------------
