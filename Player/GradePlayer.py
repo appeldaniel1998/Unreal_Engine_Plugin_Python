@@ -8,7 +8,7 @@ from Core.PublicDroneControl import PublicDroneControl
 
 class GradePlayer(threading.Thread):
     def __init__(self, publicDroneControl: PublicDroneControl, logger: Logger, simulationTime: int, addPointsForRecognition: float,
-                 decreasePointsPerSec: float, pointsDeductedForCollision: float):
+                 decreasePointsPerSec: float, pointsDeductedForCollision: float, initialPoints: float):
         super().__init__()
 
         self.publicDroneControl = publicDroneControl
@@ -18,7 +18,7 @@ class GradePlayer(threading.Thread):
         self.decreasePointsPerSec = decreasePointsPerSec
         self.pointsDeductedForCollision = pointsDeductedForCollision
 
-        self.points = 0  # Start with 0 points
+        self.points = initialPoints  # Start with 0 points
         self._stop_event = threading.Event()
         self._lock = threading.Lock()  # To ensure thread-safe operations
 

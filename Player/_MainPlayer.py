@@ -17,7 +17,8 @@ def loadSimParams():
     with open(path, "r") as file:  # Read info from file
         simulationParams: json = json.load(file)
     return SimulationParams(simulationParams["numOfPeople"], simulationParams["sunAngle"], simulationParams["addPointsForRecognition"],
-                            simulationParams["decreasePointsPerSec"], simulationParams["simulationTime"], simulationParams["pointsDeductedForCollision"])
+                            simulationParams["decreasePointsPerSec"], simulationParams["simulationTime"], simulationParams["pointsDeductedForCollision"],
+                            simulationParams["initialPoints"])
 
 
 def initSimulation():
@@ -39,7 +40,8 @@ if __name__ == '__main__':
                         simulationTime=simParams.simulationTime,  # Duration in seconds
                         addPointsForRecognition=simParams.addPointsForRecognition,
                         decreasePointsPerSec=simParams.decreasePointsPerSec,
-                        pointsDeductedForCollision=simParams.pointsDeductedForCollision)
+                        pointsDeductedForCollision=simParams.pointsDeductedForCollision,
+                        initialPoints=simParams.initialPoints)
     grade.start()
 
     player_control_thread = PlayerControlThread(publicDroneControl=publicDroneControl, logger=logger, gradeThread=grade)

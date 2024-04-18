@@ -4,5 +4,6 @@
     "addPointsForRecognition": 5.0,
     "decreasePointsPerSec": 1.0,
     "simulationTime": 120,
-    "pointsDeductedForCollision": 1000.0
+    "pointsDeductedForCollision": 1000.0,
+    "initialPoints": 0.0
 }
