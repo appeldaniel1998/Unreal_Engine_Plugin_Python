@@ -80,7 +80,7 @@ class Gui:
         start_button = tk.Button(self.popup,
                                  text="Save & Exit",
                                  command=lambda: self.convertParams(people_entry, angle_entry, recognize_entry, pdecrease_entry, ttime_entry, pCollisionEntry, initialPointsEntry))
-        start_button.grid(row=5, columnspan=2)
+        start_button.grid(row=7, columnspan=2)
 
         self.popup.mainloop()
 

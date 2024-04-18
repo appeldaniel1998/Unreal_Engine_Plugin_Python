@@ -5,7 +5,9 @@ from pathlib import Path
 
 from Core import Logger
 from AI.ArucoDetection import ArucoDetection
+from Core.DroneState import DroneState
 from Core.PublicDroneControl import PublicDroneControl
+from Core.SimulationParams import SimulationParams
 from YoloImpl.MainYoloDetect import YoloDetection
 from AI.ThreadSafeResults import ThreadSafeResults
 
@@ -24,31 +26,28 @@ class GradeAI(threading.Thread):
     2. Sending the current grade at some rate per second to the client.
     """
 
-    def __init__(self, logger: Logger.LoggerThread, publicDroneControl: PublicDroneControl):
+    def __init__(self, logger: Logger.LoggerThread, publicDroneControl: PublicDroneControl, simParams: SimulationParams):
         """
         Constructor of the class. Reads the gradeConfig json file for the needed grading parameters.
         :param logger: logger to log the needed information
         :param publicDroneControl: PublicDroneControl object to access the needed information in run function
+        :param simParams: SimulationParams object to get the needed parameters of the simulation
         """
 
         # Initializing the thread without running it
         threading.Thread.__init__(self)
-        self._publicDroneControl = publicDroneControl
         self._stop_event = threading.Event()
+        self._lock = threading.Lock()  # To ensure thread-safe operations
 
+        self._publicDroneControl = publicDroneControl  # PublicDroneControl object to access the needed information in run function
         self._logger = logger  # Logger to file
 
-        current_script_path = Path(__file__).resolve()  # Get the path of the current script
-        root_path = current_script_path.parent.parent  # Navigate to the root directory. Adjust the number of .parent based on your directory structure
-        config_path = root_path / 'ConfigFiles' / 'gradeConfig.json'  # Construct the full path to the configuration file
-        gradeConfig = json.load(open(config_path, "r"))  # Reading gradeConfig JSON from file
-
         # Load parameters from JSON
-        self._currentPoints: float = gradeConfig["pointsAtStartOfGame"]
-        self._simulationTime: float = gradeConfig["simulationTime"]  # In seconds
-        self._pointsForTargetDetection: float = gradeConfig["pointsForTargetDetection"]
-        self._pointsDeductedPerCollision: float = gradeConfig["costPointsPerCollision"]
-        self._costPointsPerSec: float = gradeConfig["costPointsPerSec"]
+        self._currentPoints: float = simParams.initialPoints  # Initial points
+        self._simulationTime: float = simParams.simulationTime  # In seconds
+        self._pointsForTargetDetection: float = simParams.addPointsForRecognition
+        self._pointsDeductedPerCollision: float = simParams.pointsDeductedForCollision
+        self._costPointsPerSec: float = simParams.decreasePointsPerSec
 
         # Object of thread, which when started will have the image analysis of Yolo of the current frame in video, which can be requested
         self._yoloResults = ThreadSafeResults()
@@ -59,11 +58,8 @@ class GradeAI(threading.Thread):
         self._arucoDetectionThreadObj = ArucoDetection(self._arucoResults)
 
         # Util variables
-        currTime = time.time()
-        self._timeSinceLastSec = currTime
-
-        self._timeSinceLastCollision = currTime
-        self._lastCollisionCount = 0
+        self.simulation_start_time = time.time()
+        self.last_point_time = time.time()
 
     def stop(self):
         """
@@ -87,16 +83,24 @@ class GradeAI(threading.Thread):
         :param self:
         :return:
         """
-        startTime = time.time()  # Start time of the thread
-        currTime = time.time()  # Current time of the thread
+        try:
+            self.simulation_start_time = time.time()
+            self.last_point_time = self.simulation_start_time
+            current_time = time.time()
 
-        while not self.stopped():  # Thread stops upon call to stop() method
-            droneState = self._publicDroneControl.getDroneState()
-            self._handleDecreaseGradeEachSec(currTime)
-            self._handleEndSimulationTime(startTime, currTime)
-            self._handleCollision(currTime, int(droneState["collisionCount"]))
-            self._handleImageFromUE()
-            currTime = time.time()  # Update current time
+            while not self._stop_event.is_set() and (current_time - self.simulation_start_time) < self._simulationTime:  # Run for the duration of the simulation or until stopped
+                current_time = time.time()
+                self._handleDecreaseGradeEachSec(current_time)
+                self._handleCollision()
+                self._handleImageFromUE()
+                self._logger.info(f"Points: {self._currentPoints}")
+
+                time.sleep(0.01)  # Sleep for a very short time to keep responsiveness high
+        except Exception as e:
+            self._logger.exception(f"Error in GradeAI: {e}")
+        finally:
+            self._logger.info(f"Grade thread ended. Final points: {self._currentPoints}")
+            self.stop()  # Stop the thread after the duration
 
     def _handleEndSimulationTime(self, startTime: float, currTime: float):
         """
@@ -109,27 +113,26 @@ class GradeAI(threading.Thread):
             self._logger.info(f"Simulation has ended due to timeout. Final number of points: {self._currentPoints}")  # Logging
             self.stop()  # Stop thread
 
-    def _handleDecreaseGradeEachSec(self, currTime: float):
+    def _handleDecreaseGradeEachSec(self, current_time: float):
         """
         Function decrease 1 point each second,
         To teach the drone that it depend on time.
         """
-        if abs(currTime - self._timeSinceLastSec) > 1:  # Every second
-            self._currentPoints -= self._costPointsPerSec
-            self._timeSinceLastSec = currTime
-            self._logger.info(f"Decrease points per sec: current points: {self._currentPoints} points")  # Logging
+        if current_time - self.last_point_time >= 1:  # Check if a full second has passed since the last point deduction
+            with self._lock:
+                self._currentPoints -= self._costPointsPerSec  # Deduct points
+                self.last_point_time = current_time
 
-    def _handleCollision(self, currTime: float, collisionCount: int):
+    def _handleCollision(self):
         """
         Function to handle the collision of the drone with physical objects
         :return: None
         """
-        if collisionCount > self._lastCollisionCount:  # If collision occurred
-            if currTime - self._timeSinceLastCollision > 2:  # if enough time passed since last collision (more than 2 seconds) (to avoid multiple collisions in a row)
-                self._currentPoints -= self._pointsDeductedPerCollision
-                self._timeSinceLastCollision = currTime
-                self._lastCollisionCount = collisionCount
-                self._logger.info(f"Collision Occurred! current points: {self._currentPoints} points")  # Logging
+        state: DroneState = self._publicDroneControl.getDroneState()
+        if state is not None and state.collisionCount != 0:
+            self._currentPoints -= self._pointsDeductedPerCollision
+            self._logger.info(f"Collision detected. Points deducted: {self._pointsDeductedPerCollision}")
+            self.stop()  # Stop the thread if a collision is detected and end simulation # Logging
 
     def _handleImageFromUE(self):
         if not self._yoloDetectionThreadObj.is_running():  # If the yolo thread is not yet running, run it

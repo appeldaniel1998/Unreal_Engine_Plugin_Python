@@ -4,21 +4,21 @@ import time
 from Core.DroneState import DroneState
 from Core.Logger import LoggerThread as Logger
 from Core.PublicDroneControl import PublicDroneControl
+from Core.SimulationParams import SimulationParams
 
 
 class GradePlayer(threading.Thread):
-    def __init__(self, publicDroneControl: PublicDroneControl, logger: Logger, simulationTime: int, addPointsForRecognition: float,
-                 decreasePointsPerSec: float, pointsDeductedForCollision: float, initialPoints: float):
+    def __init__(self, publicDroneControl: PublicDroneControl, logger: Logger, simParams: SimulationParams):
         super().__init__()
 
         self.publicDroneControl = publicDroneControl
         self.logger = logger
-        self.simulationTime = simulationTime  # Duration in seconds
-        self.addPointsForRecognition = addPointsForRecognition
-        self.decreasePointsPerSec = decreasePointsPerSec
-        self.pointsDeductedForCollision = pointsDeductedForCollision
+        self.simulationTime = simParams.simulationTime  # Duration in seconds
+        self.addPointsForRecognition = simParams.addPointsForRecognition
+        self.decreasePointsPerSec = simParams.decreasePointsPerSec
+        self.pointsDeductedForCollision = simParams.pointsDeductedForCollision
+        self.points = simParams.initialPoints  # Starting with a number of points
 
-        self.points = initialPoints  # Start with 0 points
         self._stop_event = threading.Event()
         self._lock = threading.Lock()  # To ensure thread-safe operations
 
@@ -36,14 +36,14 @@ class GradePlayer(threading.Thread):
                 current_time = time.time()
                 self._handlePerSecondDeduction(current_time)
                 self._handleCollisions()
-                print(f"Points: {self.points}")
-                time.sleep(0.1)  # Sleep for a very short time to keep responsiveness high
+                self.logger.info(f"Points: {self.points}")
+                time.sleep(0.01)  # Sleep for a very short time to keep responsiveness high
 
         except Exception as e:
             self.logger.exception(f"Error in GradePlayer: {e}")
         finally:
             self.logger.info(f"Grade thread ended. Final points: {self.points}")
-            self.stop()   # Stop the thread after the duration
+            self.stop()  # Stop the thread after the duration
 
     def add_points(self, numOfPointsToAdd):
         with self._lock:
@@ -69,6 +69,10 @@ class GradePlayer(threading.Thread):
                 self.last_point_time = current_time
 
     def _handleCollisions(self):
+        """
+        Function to handle the collision of the drone with physical objects
+        :return: None
+        """
         state: DroneState = self.publicDroneControl.getDroneState()
         if state is not None and state.collisionCount != 0:
             self.points -= self.pointsDeductedForCollision
