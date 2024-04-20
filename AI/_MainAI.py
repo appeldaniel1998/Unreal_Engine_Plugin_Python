@@ -18,7 +18,7 @@ if __name__ == '__main__':
     grade.start()
 
     # Create and start the dummy algo thread
-    dummyAlgoThread = DummyAlgoThread(publicDroneControl=publicDroneControl, logger=logger, gradeThread=grade)
+    dummyAlgoThread = DummyAlgoThread(publicDroneControl=publicDroneControl, logger=logger)
     dummyAlgoThread.start()
 
     try:

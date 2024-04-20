@@ -69,7 +69,10 @@ class PublicDroneControl:
             'getDistanceToCameraDirection': Queue(),
             'getCameraTarget': Queue(),
             'SpawnXActors': Queue(),
-            'GetTargetOfPoint': Queue()
+            'GetTargetOfPoint': Queue(),
+            'turnTowards': Queue(),
+            'goto': Queue(),
+            'turnCameraXDeg': Queue()
         }
 
         self.listener_thread = threading.Thread(target=self._listen)
@@ -92,6 +95,12 @@ class PublicDroneControl:
                 self.message_queues['SpawnXActors'].put(extractMessageFromPrefix('SpawnXActors:', message))
             elif 'GetTargetOfPoint:' in message:
                 self.message_queues['GetTargetOfPoint'].put(extractMessageFromPrefix('GetTargetOfPoint:', message))
+            elif 'turnTowards:' in message:
+                self.message_queues['turnTowards'].put(extractMessageFromPrefix('turnTowards:', message))
+            elif 'goto:' in message:
+                self.message_queues['goto'].put(extractMessageFromPrefix('goto:', message))
+            elif 'turnCameraXDeg:' in message:
+                self.message_queues['turnCameraXDeg'].put(extractMessageFromPrefix('turnCameraXDeg:', message))
 
     def _send(self, msg: str) -> None:
         """
@@ -227,6 +236,11 @@ class PublicDroneControl:
         msg = '{"controls": {"turnTowards": {"turnTowardsXVal": ' + str(x) + ', "turnTowardsYVal": ' + str(y) + ', "turnTowardsZVal": ' + str(
             z) + ', "turnTowardsSpeed": ' + str(speed) + '}}}'
         self._send(msg)
+        message = self.message_queues['turnTowards'].get()  # This will block until an item is available
+        if message == 'Done':
+            return
+        else:
+            raise Exception(f"Error in turning towards location: {message}")
 
     def moveDroneToLocation(self, x: float, y: float, z: float, speed: float = 2, turnWithMove: bool = True) -> None:
         """
@@ -246,6 +260,28 @@ class PublicDroneControl:
         msg = ('{"controls": {"goto": {"gotoXVal": ' + str(x) + ', "gotoYVal": ' + str(y) + ', "gotoZVal": ' + str(z) + ', "gotoSpeed": ' +
                str(speed) + ', "turnWithMove": ' + turnWithMove + '}}}')
         self._send(msg)
+
+        message = self.message_queues['goto'].get()  # This will block until an item is available
+        if message == 'Done':
+            return
+        else:
+            raise Exception(f"Error in moving to location: {message}")
+
+    def turnCameraXDegreesAtSpeed(self, degrees: float, speedMultiplier: float = 60) -> None:
+        """
+        This function is used to turn the camera a certain number of degrees at a certain speed
+        :param degrees: number of degrees to turn
+        :param speedMultiplier: speed at which to turn (multiplier of default speed)
+        :return: None
+        """
+        msg = '{"controls": {"turnCameraXDeg": {"degrees": ' + str(degrees) + ', "speedMultiplier": ' + str(speedMultiplier) + '}}}'
+        self._send(msg)
+
+        message = self.message_queues['turnCameraXDeg'].get()  # This will block until an item is available
+        if message == 'Done':
+            return
+        else:
+            raise Exception(f"Error in turning camera: {message}")
 
     #  End Advanced Controls ----------------------------------------------------
 
@@ -370,6 +406,24 @@ class PublicDroneControl:
         :return: True if verified, false otherwise
         """
         target = self.getCameraTarget()
+
+        if target is None:
+            return False
+
+        if target.position in self.spawnedActors:
+            index = self.spawnedActors.index(target.position)  # Get the index of the actor in the list
+            msg = '{"DestroyActor": ' + str(index) + '}'
+            self._send(msg)
+            return True
+        return False
+
+    def verifyAndDestroyActorFromPoint(self, normalizedX, normalizedY) -> bool:
+        """
+        Method to verify that the target is a spawned actor, and if verified, remove the actor from the simulation
+
+        :return: True if verified, false otherwise
+        """
+        target = self.getTargetOfPoint(normalizedX, normalizedY)
 
         if target is None:
             return False

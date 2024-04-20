@@ -2,7 +2,9 @@ import json
 import threading
 import time
 from pathlib import Path
+from typing import List
 
+from AI.YoloDetectionObject import YoloDetectionObject
 from Core import Logger
 from AI.ArucoDetection import ArucoDetection
 from Core.DroneState import DroneState
@@ -95,7 +97,7 @@ class GradeAI(threading.Thread):
                 self._handleImageFromUE()
                 self._logger.info(f"Points: {self._currentPoints}")
 
-                time.sleep(0.01)  # Sleep for a very short time to keep responsiveness high
+                time.sleep(1)  # Sleep for a very short time to keep responsiveness high
         except Exception as e:
             self._logger.exception(f"Error in GradeAI: {e}")
         finally:
@@ -135,18 +137,34 @@ class GradeAI(threading.Thread):
             self.stop()  # Stop the thread if a collision is detected and end simulation # Logging
 
     def _handleImageFromUE(self):
+        self._logger.info("Handling image from UE")
+        self._handleYoloDetection()
+        self._logger.info("Handling image from UE after yolo")
+        # self._handleArucoDetection()
+
+    def _handleYoloDetection(self):
         if not self._yoloDetectionThreadObj.is_running():  # If the yolo thread is not yet running, run it
-            self._yoloDetectionThreadObj.run()
+            self._yoloDetectionThreadObj.start()
+
+        yoloLatestResults: List[YoloDetectionObject] = self._yoloResults.get_latest_results()  # get results of yolo detection (request results)
+        self._logger.info("Yolo detection: " + str(yoloLatestResults))  # log results
+
+        self._yoloResults.clear_results()  # Optional: Clear results after logging if not already cleared
+
+        for detection in yoloLatestResults:
+            if detection.objectName == "person":
+                self._currentPoints += self._pointsForTargetDetection
+                self._logger.info(f"Target detected. Points added: {self._pointsForTargetDetection}")
+
+                self._publicDroneControl.verifyAndDestroyActorFromPoint(detection.xCenter, detection.yCenter)  # Destroy the actor (person) if detected
+
+    def _handleArucoDetection(self):
         if not self._arucoDetectionThreadObj.is_running():  # If the aruco thread is not yet running, run it
             self._arucoDetectionThreadObj.run()
 
-        yoloLatestResults = self._yoloResults.get_latest_results()  # get results of yolo detection (request results)
-        self._logger.info("Yolo detection: " + str(yoloLatestResults))  # log results
-        # TODO: add handling of seen objects. If not needed then remove previous 2 lines.
-
         arucoLatestResults = self._arucoResults.get_latest_results()  # get results of aruco codes detection (request results)
-        self._logger.info("Yolo detection: " + str(arucoLatestResults))  # log results
-        # TODO: add handling of seen aruco codes. If not needed then remove previous 2 lines.
+        self._logger.info("Aruco detection: " + str(arucoLatestResults))  # log results
 
+        self._arucoResults.clear_results()  # Optional: Clear results after logging if not already cleared
 
 

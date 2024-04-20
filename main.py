@@ -11,10 +11,10 @@ if __name__ == '__main__':
 
     publicDroneControl = PublicDroneControl("127.0.0.1", 3001)  # Create an instance of PublicDroneControl
     print("PublicDroneControl created")
-    # Initialize lastTime
-    startTime = time.time()  # Store the initial time
-    publicDroneControl.spawnXActors(20)
-    print("Actors spawned")
+    # # Initialize lastTime
+    # startTime = time.time()  # Store the initial time
+    # publicDroneControl.spawnXActors(20)
+    # print("Actors spawned")
 
     # Create and start the Grade thread
     # grade = GradeAI(logger, publicDroneControl)
@@ -81,6 +81,10 @@ if __name__ == '__main__':
             publicDroneControl.requestDaytimeChange(10)
         if keyboard.is_pressed('3'):
             publicDroneControl.spawnXActors(20)
+        if keyboard.is_pressed('4'):
+            publicDroneControl.turnCameraXDegreesAtSpeed(10, 60)
+        if keyboard.is_pressed('5'):
+            publicDroneControl.turnCameraXDegreesAtSpeed(-10, 60)
         # if keyboard.is_pressed('4'):
         #     publicDroneControl.verifyAndDestroyActor(publicDroneControl.getCameraTarget())
         time.sleep(0.01)  # small delay to prevent hogging the CPU
@@ -88,5 +92,5 @@ if __name__ == '__main__':
     #  ----------------------------------------------------------------
 
     #  Finish simulation
-    grade.stop()
-    exit(0)
+    # grade.stop()
+    # exit(0)

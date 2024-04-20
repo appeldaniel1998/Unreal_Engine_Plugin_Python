@@ -34,10 +34,13 @@ import os
 import sys
 import threading
 from pathlib import Path
+from typing import List
+
 import torch
 from AI.ThreadSafeResults import ThreadSafeResults
 from ultralytics.utils.plotting import Annotator, colors, save_one_box
 
+from AI.YoloDetectionObject import YoloDetectionObject
 from YoloImpl.models.common import DetectMultiBackend
 from YoloImpl.utils.dataloaders import IMG_FORMATS, VID_FORMATS, LoadImages, LoadScreenshots, LoadStreams
 from YoloImpl.utils.general import (LOGGER, Profile, check_file, check_img_size, check_imshow, check_requirements, colorstr, cv2,
@@ -272,8 +275,14 @@ def runYoloDetection(
         # Print time (inference-only)
         LOGGER.info(f"{s}{'' if len(det) else '(no detections), '}{dt[1].dt * 1E3:.1f}ms")
 
+        # Construct object detection results
+        retList: List[YoloDetectionObject] = []
+        for i in range(len(all_coordinates[0])):
+            currDetection = all_coordinates[0][i].split(' ')
+            retList.append(YoloDetectionObject(currDetection))
+
         # Update shared_results with the latest detection results
-        shared_results.update_results(all_coordinates)
+        shared_results.update_results(retList)
 
     # # Print results
     # # Print or process the coordinates

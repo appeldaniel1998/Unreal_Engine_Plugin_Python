@@ -14,7 +14,7 @@ if __name__ == '__main__':
     # Create and start the Grade thread
     grade = GradePlayer(publicDroneControl=publicDroneControl,
                         logger=logger,
-                        simParams= simParams)
+                        simParams=simParams)
     grade.start()
 
     # Create and start the PlayerControl thread
