@@ -103,7 +103,7 @@ def runYoloDetection(
         view_img=False,  # show results
         save_txt=False,  # save results to *.txt
         save_csv=False,  # save results in CSV format
-        save_conf=False,  # save confidences in --save-txt labels
+        save_conf=True,  # save confidences in --save-txt labels
         save_crop=False,  # save cropped prediction boxes
         nosave=False,  # do not save images/videos
         classes=None,  # filter by class: --class 0, or --class 0 2 3
@@ -220,30 +220,14 @@ def runYoloDetection(
                 # Write results
                 for *xyxy, conf, cls in reversed(det):
                     c = int(cls)  # integer class
-                    label = names[c] if hide_conf else f'{names[c]}'
-                    confidence = float(conf)
-                    confidence_str = f'{confidence:.2f}'
+                    label = f'{names[c]}'
 
-                    if save_csv:
-                        write_to_csv(p.name, label, confidence_str)
+                    xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # Coordinates format:  x_center, y_center, width, height
 
-                    if save_txt:  # Write to file
-                        xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
-                        line = (cls, *xywh, conf) if save_conf else (cls, *xywh)  # label format
-                        with open(f'{txt_path}.txt', 'a') as f:
-                            f.write(('%g ' * len(line)).rstrip() % line + '\n')
+                    # xyxy = ((torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # Coordinates format:   (xmin, ymin, xmax, ymax)
 
-                    if save_img or save_crop or view_img:  # Add bbox to image
-                        c = int(cls)  # integer class
-                        label = None if hide_labels else (names[c] if hide_conf else f'{names[c]} {conf:.2f}')
-                        # This line responsible for draw the frames on the detected objects
-                        annotator.box_label(xyxy, label, color=colors(c, True))
-                    # Coordinates format:  x_center, y_center, width, height
-                    # xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()
-                    # Coordinates format:   (xmin, ymin, xmax, ymax)
-                    xyxy = ((torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()
-                    line = (label, *xyxy, conf) if save_conf else (label, *xyxy)  # label format xyxy
-                    # line = (label, *xywh, conf) if save_conf else (label, *xywh)  # label format xywh
+                    line = (label, *xywh, float(conf))  # Format: label, x_center, y_center, width, height, confidence
+
                     printed_line = ('%s ' * len(line)).rstrip() % line
                     coordinates_and_labels_for_image.append(printed_line)
 
@@ -253,53 +237,24 @@ def runYoloDetection(
                 # Append the coordinates for the current image to the overall list
                 all_coordinates.append(coordinates_and_labels_for_image)
 
-            # Save results (image with detections)
-            if save_img:
-                if dataset.mode == 'image':
-                    cv2.imwrite(save_path, im0)
-                else:  # 'video' or 'stream'
-                    if vid_path[i] != save_path:  # new video
-                        vid_path[i] = save_path
-                        if isinstance(vid_writer[i], cv2.VideoWriter):
-                            vid_writer[i].release()  # release previous video writer
-                        if vid_cap:  # video
-                            fps = vid_cap.get(cv2.CAP_PROP_FPS)
-                            w = int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-                            h = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-                        else:  # stream
-                            fps, w, h = 30, im0.shape[1], im0.shape[0]
-                        save_path = str(Path(save_path).with_suffix('.mp4'))  # force *.mp4 suffix on results videos
-                        vid_writer[i] = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
-                    vid_writer[i].write(im0)
-
-        # Print time (inference-only)
-        LOGGER.info(f"{s}{'' if len(det) else '(no detections), '}{dt[1].dt * 1E3:.1f}ms")
+        # LOGGER.info(f"{s}{'' if len(det) else '(no detections), '}{dt[1].dt * 1E3:.1f}ms")  # Print time (inference-only)
 
         # Construct object detection results
         retList: List[YoloDetectionObject] = []
-        for i in range(len(all_coordinates[0])):
-            currDetection = all_coordinates[0][i].split(' ')
-            retList.append(YoloDetectionObject(currDetection))
+        if len(all_coordinates) != 0:
+            for i in range(len(all_coordinates[0])):
+                currDetection = all_coordinates[0][i].split(' ')
+                retList.append(YoloDetectionObject(currDetection))
 
         # Update shared_results with the latest detection results
+        all_coordinates.clear()
         shared_results.update_results(retList)
 
-    # # Print results
-    # # Print or process the coordinates
-    # for image_idx, coordinates_and_labels_for_image in enumerate(all_coordinates):
-    #     print(f"Coordinates for image {image_idx + 1}:")
-    #     for idx, xyxy in enumerate(coordinates_and_labels_for_image):
-    #         print(f"  Element {idx + 1}: {xyxy}")
-    #     print()
-    # t = tuple(x.t / seen * 1E3 for x in dt)  # speeds per image
-    # LOGGER.info(f'Speed: %.1fms pre-process, %.1fms inference, %.1fms NMS per image at shape {(1, 3, *imgsz)}' % t)
     if save_txt or save_img:
         s = f"\n{len(list(save_dir.glob('labels/*.txt')))} labels saved to {save_dir / 'labels'}" if save_txt else ''
         LOGGER.info(f"Results saved to {colorstr('bold', save_dir)}{s}")
     if update:
         strip_optimizer(weights[0])  # update model (to fix SourceChangeWarning)
-
-    return all_coordinates
 
 
 class YoloDetection(threading.Thread):

@@ -146,17 +146,17 @@ class GradeAI(threading.Thread):
         if not self._yoloDetectionThreadObj.is_running():  # If the yolo thread is not yet running, run it
             self._yoloDetectionThreadObj.start()
 
-        yoloLatestResults: List[YoloDetectionObject] = self._yoloResults.get_latest_results()  # get results of yolo detection (request results)
-        self._logger.info("Yolo detection: " + str(yoloLatestResults))  # log results
+        if self._yoloResults.getIsChanged():  # If the results have been updated
+            yoloLatestResults: List[YoloDetectionObject] = self._yoloResults.get_latest_results()  # get results of yolo detection (request results)
 
-        self._yoloResults.clear_results()  # Optional: Clear results after logging if not already cleared
+            peopleCount = 0
+            for detection in yoloLatestResults:
+                if detection.objectName == "person":
+                    peopleCount += 1
+                    self._publicDroneControl.verifyAndDestroyActorFromPoint(detection.xCenter, detection.yCenter)  # Destroy the actor (person) if detected
 
-        for detection in yoloLatestResults:
-            if detection.objectName == "person":
-                self._currentPoints += self._pointsForTargetDetection
-                self._logger.info(f"Target detected. Points added: {self._pointsForTargetDetection}")
-
-                self._publicDroneControl.verifyAndDestroyActorFromPoint(detection.xCenter, detection.yCenter)  # Destroy the actor (person) if detected
+            self._currentPoints += self._pointsForTargetDetection * peopleCount  # Add points for each person detected
+            self._logger.info(f"{peopleCount} target/s detected. Points added: {self._pointsForTargetDetection * peopleCount}")
 
     def _handleArucoDetection(self):
         if not self._arucoDetectionThreadObj.is_running():  # If the aruco thread is not yet running, run it

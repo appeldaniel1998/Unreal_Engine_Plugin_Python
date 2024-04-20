@@ -46,7 +46,7 @@ if __name__ == '__main__':
             grade.stop()
 
         # Now you can safely join since you've signaled them to stop
-        dummyAlgoThread.join()
+        # dummyAlgoThread.join()
         grade.join()
 
         logger.info("All threads stopped cleanly.")

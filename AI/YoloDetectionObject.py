@@ -3,16 +3,21 @@ from typing import List
 
 class YoloDetectionObject:
     def __init__(self, asList: List):
+        """
+
+        :param asList:  input list of strings in the following format:
+                        label, x_center, y_center, width, height, confidence
+        """
         self.objectName = asList[0]
-        self.confidence = asList[1]
-        self.xCenter = asList[2]
-        self.yCenter = asList[3]
-        self.width = asList[4]
-        self.height = asList[5]
+        self.xCenter = asList[1]
+        self.yCenter = asList[2]
+        self.width = asList[3]
+        self.height = asList[4]
+        self.confidence = asList[5]
         # self.boundingBox = [asList[2], asList[3], asList[4], asList[5]]
 
     def __str__(self):
-        return f"YoloDetectionObject: {self.objectName} at ({self.xCenter}, {self.yCenter}) with confidence {self.confidence}"
+        return f"{self.objectName}"
 
     def __repr__(self):
         return self.__str__()
