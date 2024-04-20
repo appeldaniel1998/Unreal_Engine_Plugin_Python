@@ -3,6 +3,9 @@ from typing import List
 
 
 class ThreadSafeResults:
+    """
+    Class to store the results of the Yolo detection and Aruco detection threads in a thread-safe manner.
+    """
     def __init__(self):
         self.lock = threading.Lock()
         self.isChanged = False

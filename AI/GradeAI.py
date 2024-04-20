@@ -62,6 +62,7 @@ class GradeAI(threading.Thread):
         # Util variables
         self.simulation_start_time = time.time()
         self.last_point_time = time.time()
+        self.totalTargetsDetected = 0
 
     def stop(self):
         """
@@ -102,6 +103,7 @@ class GradeAI(threading.Thread):
             self._logger.exception(f"Error in GradeAI: {e}")
         finally:
             self._logger.info(f"Grade thread ended. Final points: {self._currentPoints}")
+            self._logger.info(f"Total targets detected: {self.totalTargetsDetected}")
             self.stop()  # Stop the thread after the duration
 
     def _handleEndSimulationTime(self, startTime: float, currTime: float):
@@ -137,12 +139,21 @@ class GradeAI(threading.Thread):
             self.stop()  # Stop the thread if a collision is detected and end simulation # Logging
 
     def _handleImageFromUE(self):
+        """
+        Function to handle the image from the UE. It will handle the Yolo detection and Aruco detection
+        :return:
+        """
         self._logger.info("Handling image from UE")
         self._handleYoloDetection()
         self._logger.info("Handling image from UE after yolo")
         # self._handleArucoDetection()
 
     def _handleYoloDetection(self):
+        """
+        Function to handle the Yolo detection. It will get the latest results from the Yolo detection thread and handle them by adding points if a target is detected,
+        and destroying the actor (person) if detected
+        :return:
+        """
         if not self._yoloDetectionThreadObj.is_running():  # If the yolo thread is not yet running, run it
             self._yoloDetectionThreadObj.start()
 
@@ -156,9 +167,14 @@ class GradeAI(threading.Thread):
                     self._publicDroneControl.verifyAndDestroyActorFromPoint(detection.xCenter, detection.yCenter)  # Destroy the actor (person) if detected
 
             self._currentPoints += self._pointsForTargetDetection * peopleCount  # Add points for each person detected
+            self.totalTargetsDetected += peopleCount
             self._logger.info(f"{peopleCount} target/s detected. Points added: {self._pointsForTargetDetection * peopleCount}")
 
     def _handleArucoDetection(self):
+        """
+        Function to handle the Aruco detection. It will get the latest results from the Aruco detection thread and log them
+        :return:
+        """
         if not self._arucoDetectionThreadObj.is_running():  # If the aruco thread is not yet running, run it
             self._arucoDetectionThreadObj.run()
 

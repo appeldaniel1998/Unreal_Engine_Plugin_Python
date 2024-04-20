@@ -4,13 +4,16 @@ import time
 from pathlib import Path
 from typing import List
 
-from AI.GradeAI import GradeAI
 from Core.Coordinate import Coordinate
 from Core.Logger import LoggerThread as Logger
 from Core.PublicDroneControl import PublicDroneControl
 
 
 def read_json_to_list_of_lists() -> List[Coordinate]:
+    """
+    Reads the graphPointsConfig.json file and returns a list of Coordinate objects.
+    :return: List[Coordinate] - list of Coordinate objects representing the points to visit
+    """
     current_script_path = Path(__file__).resolve()  # Get the path of the current script
     root_path = current_script_path.parent.parent  # Navigate to the root directory. Adjust the number of .parent based on your directory structure
     path = root_path / 'ConfigFiles' / "graphPointsConfig.json"  # Construct the full path to the configuration file
@@ -36,12 +39,24 @@ class DummyAlgoThread(threading.Thread):
         self._stop_event = threading.Event()
 
     def stop(self):
+        """
+        Stops the thread.
+        :return:
+        """
         self._stop_event.set()
 
     def is_stopped(self):
+        """
+        Returns whether the thread is stopped.
+        :return: bool
+        """
         return self._stop_event.is_set()
 
     def run(self):
+        """
+        Dummy algorithm to move the drone to the points specified in the graphPointsConfig.json file.
+        :return:
+        """
         try:
             self.logger.info("Running dummy algorithm...")
 

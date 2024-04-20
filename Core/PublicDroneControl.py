@@ -8,7 +8,13 @@ from Core.DroneState import DroneState
 from Core.Target import Target
 
 
-def extractMessageFromPrefix(prefix, message):
+def extractMessageFromPrefix(prefix, message) -> str or None:
+    """
+    This function is used to extract the message part of a string after a given prefix
+    :param prefix: The prefix to search for
+    :param message: The message to extract from
+    :return: The message part of the string after the prefix or None if the prefix is not found
+    """
     # Split the message at the prefix and get the remainder
     parts = message.split(prefix, 1)  # The second argument '1' ensures splitting is done only once
     if len(parts) > 1:
@@ -17,6 +23,11 @@ def extractMessageFromPrefix(prefix, message):
 
 
 def parseHitResult(hitResultMsg: str) -> Target or None:
+    """
+    This function is used to parse the hit result message received from the UE engine into a Target object
+    :param hitResultMsg: message received from the UE engine as a result of a hit test as a string
+    :return: Target object containing the display name, class name, and location of the hit target or None if no target is detected
+    """
     if hitResultMsg == 'None':
         return None
 
@@ -35,6 +46,11 @@ def parseHitResult(hitResultMsg: str) -> Target or None:
 
 
 def _validate_target_format(input_string: str) -> bool:
+    """
+    This function is used to validate the format of the target string received from the UE engine
+    :param input_string: The string to validate
+    :return: True if the string is in the correct format, False otherwise
+    """
     try:
         # Attempt to parse the JSON string
         jsonData = json.loads(input_string)

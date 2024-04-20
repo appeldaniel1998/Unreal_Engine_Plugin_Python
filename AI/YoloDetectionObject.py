@@ -2,9 +2,11 @@ from typing import List
 
 
 class YoloDetectionObject:
+    """
+    Class to represent the object detected by Yolo.
+    """
     def __init__(self, asList: List):
         """
-
         :param asList:  input list of strings in the following format:
                         label, x_center, y_center, width, height, confidence
         """
@@ -14,7 +16,6 @@ class YoloDetectionObject:
         self.width = asList[3]
         self.height = asList[4]
         self.confidence = asList[5]
-        # self.boundingBox = [asList[2], asList[3], asList[4], asList[5]]
 
     def __str__(self):
         return f"{self.objectName}"
