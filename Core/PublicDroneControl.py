@@ -286,10 +286,15 @@ class PublicDroneControl:
     def turnCameraXDegreesAtSpeed(self, degrees: float, speedMultiplier: float = 60) -> None:
         """
         This function is used to turn the camera a certain number of degrees at a certain speed
-        :param degrees: number of degrees to turn
+        :param degrees: number of degrees to turn. value must be in the range of -89 to 89. If not, the value will be clamped to this range
         :param speedMultiplier: speed at which to turn (multiplier of default speed)
         :return: None
         """
+        if degrees > 89:
+            degrees = 89
+        elif degrees < -89:
+            degrees = -89
+
         msg = '{"controls": {"turnCameraXDeg": {"degrees": ' + str(degrees) + ', "speedMultiplier": ' + str(speedMultiplier) + '}}}'
         self._send(msg)
 
