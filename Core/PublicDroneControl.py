@@ -388,7 +388,7 @@ class PublicDroneControl:
         msg = '{"DaytimeChangeRequested": ' + str(addDegrees) + '}'
         self._send(msg)
 
-    def spawnXActors(self, numOfActorsToSpawn: int) -> list[tuple[int, int, int]] or None:
+    def spawnXActors(self, numOfActorsToSpawn: int) -> list[Coordinate] or None:
         """
         The method should be called at start of simulation
         This method spawns people NPC in the simulation, where numOfActorsToSpawn is the number of actors which will be spawned randomly.
