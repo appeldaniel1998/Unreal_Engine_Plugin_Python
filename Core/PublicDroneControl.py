@@ -8,7 +8,7 @@ from Core.DroneState import DroneState
 from Core.Target import Target
 
 
-def extractMessageFromPrefix(prefix, message) -> str or None:
+def _extractMessageFromPrefix(prefix, message) -> str or None:
     """
     This function is used to extract the message part of a string after a given prefix
     :param prefix: The prefix to search for
@@ -312,7 +312,7 @@ class PublicDroneControl:
         """
         This function is used to get the current state of the drone
         The state includes the location of the drone (in UE grid coordinates) and the number of collisions up to that point
-        :return: None
+        :return: DroneState
         """
         msg = '{"getDroneState": "true"}'
         self._send(msg)
