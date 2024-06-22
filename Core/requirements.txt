@@ -11,6 +11,4 @@ ultralytics==8.2.2
 setuptools==69.5.1
 gitpython>=3.1.30
 
-# TODO add requirements json and tkinter (gui)
-
 # OBS Studio for webcam capture
